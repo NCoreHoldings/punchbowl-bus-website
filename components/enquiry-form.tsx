@@ -206,6 +206,9 @@ export function EnquiryForm() {
       />
     </label>
   );
+  // The server reports whether NCore Fleets is configured; without it, sending
+  // can never succeed, so the review step explains this next to the button.
+  const offline = step === 2 && available === false;
   const prettyDate = (s: string) =>
     s
       ? new Intl.DateTimeFormat("en-AU", {
@@ -562,6 +565,14 @@ export function EnquiryForm() {
           />
         </label>
       </div>
+      {offline && (
+        <p className="form-message warning" id="send-unavailable" role="note">
+          <strong>Online sending isn’t available right now</strong>, so this
+          request can’t be sent from the website. Your details are complete —
+          please <a href={company.phoneHref}>call {company.phone}</a> and our
+          team will take your request over the phone.
+        </p>
+      )}
       <div className="form-actions">
         {step > 0 ? (
           <button
@@ -579,9 +590,8 @@ export function EnquiryForm() {
         <button
           className="button"
           type="submit"
-          disabled={
-            busy || wait > 0 || conflict || (step === 2 && available === false)
-          }
+          disabled={busy || wait > 0 || conflict || offline}
+          aria-describedby={offline ? "send-unavailable" : undefined}
         >
           {busy ? (
             <>
@@ -594,6 +604,8 @@ export function EnquiryForm() {
             <>
               Continue <ArrowRight size={17} />
             </>
+          ) : offline ? (
+            "Online sending unavailable"
           ) : locked ? (
             <>
               Retry same request <ArrowRight size={17} />
