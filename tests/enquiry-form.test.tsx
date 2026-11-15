@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { EnquiryForm } from '../components/enquiry-form';
 import type { MapsService } from '../lib/google-maps';
-const fakeMaps:MapsService={mapId:'test',suggest:vi.fn(async(input:string)=>[{id:'p1',primary:'Punchbowl Public School',secondary:'Punchbowl NSW',select:async()=>({name:'Punchbowl Public School',address:'1 School Rd, Punchbowl NSW 2196, Australia',lat:-33.92,lng:151.05})}].filter(()=>input.length>=3)),reverse:vi.fn()};
+const fakeMaps:MapsService={mapId:'test',suggest:vi.fn(async(input:string)=>[{id:'p1',primary:'Punchbowl Public School',secondary:'Punchbowl NSW',select:async()=>({name:'Punchbowl Public School',address:'1 School Rd, Punchbowl NSW 2196, Australia',lat:-33.92,lng:151.05})}].filter(()=>input.length>=3)),reverse:vi.fn(),route:vi.fn(async()=>null)};
 vi.mock('../lib/google-maps',async(orig)=>({...(await orig<typeof import('../lib/google-maps')>()),loadGoogleMaps:vi.fn(async()=>fakeMaps)}));
 const receipt={receiptId:'11111111-1111-4111-8111-111111111111',sourceSubmissionId:'client-test',receivedAt:'2035-01-01T00:00:00.000Z'};
 afterEach(()=>{cleanup();sessionStorage.clear();vi.unstubAllGlobals();});

@@ -2287,6 +2287,160 @@ textarea:disabled {
   }
 }
 
+
+/* Map icon + popup for choosing pickup and drop-off */
+.map-icon-button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.map-icon-button:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--white);
+}
+.map-icon-button:focus-visible {
+  outline: 3px solid rgb(181 31 43 / 0.35);
+  outline-offset: 2px;
+}
+.map-icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.map-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(20 22 27 / 0.55);
+}
+.map-dialog {
+  width: min(980px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  background: var(--paper);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.map-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.map-dialog-head h3 {
+  margin: 0;
+  font-family: var(--heading);
+  font-size: 1.3rem;
+  color: var(--ink);
+}
+.map-dialog-body {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.map-dialog-fields {
+  display: grid;
+  gap: 12px;
+}
+.map-place {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--ok);
+  border-radius: 12px;
+}
+.map-place.dropoff {
+  border-left-color: var(--red);
+}
+.map-place h4 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+.map-place.pickup .itinerary-badge {
+  background: var(--ok);
+}
+.map-place.dropoff .itinerary-badge {
+  background: var(--red);
+}
+.map-place-selected {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--cream);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+.map-place-selected strong {
+  color: var(--ink);
+}
+.map-place-selected span {
+  color: var(--muted);
+}
+.map-route-stats {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.map-dialog .route-map-canvas {
+  height: 420px;
+}
+.map-dialog-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--warn-soft);
+  color: #5e4813;
+  font-size: 0.86rem;
+}
+.map-dialog-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.map-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+@media (max-width: 760px) {
+  .map-dialog {
+    padding: 16px;
+  }
+  .map-dialog-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .map-dialog .route-map-canvas {
+    height: 300px;
+  }
+  .map-dialog-actions .button {
+    flex: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

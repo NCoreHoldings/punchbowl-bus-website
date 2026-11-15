@@ -17,9 +17,18 @@ export type Suggestion = {
   secondary: string;
   select: () => Promise<PlaceResult | null>;
 };
+export type LatLng = { lat: number; lng: number };
+/** A sample driving route for reference only — not the bus's actual route. */
+export type SampleRoute = {
+  path: LatLng[];
+  distanceMeters: number | null;
+  durationMillis: number | null;
+};
 export type MapsService = {
   suggest: (input: string) => Promise<Suggestion[]>;
   reverse: (lat: number, lng: number) => Promise<PlaceResult>;
+  /** Driving route between two points, or null if routing is unavailable. */
+  route: (from: LatLng, to: LatLng) => Promise<SampleRoute | null>;
   /** Present only when the real Google Maps API is loaded. */
   google?: typeof google;
   mapId: string;
@@ -117,6 +126,31 @@ async function createService(mapId: string): Promise<MapsService> {
           },
         ];
       });
+    },
+    async route(from, to) {
+      try {
+        const { Route } = (await google.maps.importLibrary(
+          "routes",
+        )) as google.maps.RoutesLibrary;
+        const { routes } = await Route.computeRoutes({
+          origin: from,
+          destination: to,
+          travelMode: "DRIVING",
+          region: "au",
+          language: "en-AU",
+          fields: ["path", "distanceMeters", "durationMillis"],
+        });
+        const r = routes?.[0];
+        if (!r?.path?.length) return null;
+        return {
+          path: r.path.map((p) => ({ lat: p.lat, lng: p.lng })),
+          distanceMeters: r.distanceMeters ?? null,
+          durationMillis: r.durationMillis ?? null,
+        };
+      } catch {
+        // Routes API not enabled for this key, or no route found.
+        return null;
+      }
     },
     async reverse(lat, lng) {
       try {

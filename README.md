@@ -81,15 +81,17 @@ When the domain moves, update `SITE_URL` and the integration's website in NCore.
 
 The journey step uses an ordered itinerary like NCore Fleets' booking form: **pickup point → up to 20 passenger stops → drop-off**, with reordering, swapping endpoints, coach access notes per point, and a return leg that is either the outward route reversed or a custom route.
 
-With `GOOGLE_MAPS_BROWSER_KEY` set, each point gets Google Places search, and a map shows numbered pins and the route line. Customers can click the map to set a point or drag a pin to adjust it. Without the key, the same itinerary works with plain address fields.
+With `GOOGLE_MAPS_BROWSER_KEY` set, each point gets Google Places search, and a **map icon** on each route opens a popup. In the popup, customers search for the pickup point and drop-off separately, see each selected place's name and address, and see a sample driving route with its distance and an approximate drive time. They can also click the map to set an empty point or drag a pin to adjust it. The popup states that the route is **a sample for reference only, not the exact bus route**. Without the key, the map icon is hidden and the itinerary uses plain address fields.
+
+The sample route uses the Routes API through the Maps JavaScript API. If the Routes API isn't enabled for the key, the popup shows a dashed straight line instead.
 
 NCore receives each point's venue name, full address and access notes (`pickup`, `stops[]`, `destination`). Coordinates aren't part of NCore's website-enquiry contract, so they aren't sent; NCore geocodes the addresses itself.
 
 Google Cloud setup (https://console.cloud.google.com):
 
 1. Create or choose a project and enable billing.
-2. Enable the **Maps JavaScript API**, **Places API (New)** and **Geocoding API**.
-3. Create an API key under **APIs & Services → Credentials**. Restrict it by **websites (HTTP referrers)** to `http://localhost:3001/*`, `https://punchbowl-bus-website.vercel.app/*` and the final domain, and restrict it to those three APIs. The key is visible in the browser by design; these restrictions are what protect it.
+2. Enable the **Maps JavaScript API**, **Places API (New)**, **Geocoding API** and **Routes API**.
+3. Create an API key under **APIs & Services → Credentials**. Restrict it by **websites (HTTP referrers)** to `http://localhost:3001/*`, `https://punchbowl-bus-website.vercel.app/*` and the final domain, and restrict it to those four APIs. The key is visible in the browser by design; these restrictions are what protect it.
 4. Optional: create a Map ID under **Map Management** and set `GOOGLE_MAPS_MAP_ID`.
 5. Set `GOOGLE_MAPS_BROWSER_KEY` in `.env.local` and in Vercel, then redeploy. `GET /api/enquiries` then includes a `maps` object.
 

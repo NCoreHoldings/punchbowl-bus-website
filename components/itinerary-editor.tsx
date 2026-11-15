@@ -1,10 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpDown,
   ChevronDown,
   ChevronUp,
-  Crosshair,
+  Map as MapIcon,
   NotebookPen,
   Plus,
   Trash2,
@@ -21,12 +21,12 @@ import {
   type TripPoint,
 } from "@/lib/itinerary";
 import { LocationField } from "./location-field";
-import { RouteMap } from "./route-map";
+import { MapPickerDialog } from "./map-picker-dialog";
 
 /**
  * Ordered itinerary editor modelled on NCore Fleets' booking form:
  * pickup point → passenger stops → drop-off, with reordering, swap,
- * per-point coach access notes and an interactive map.
+ * per-point coach access notes, plus a popup map for pickup and drop-off.
  */
 export function ItineraryEditor({
   leg,
@@ -42,19 +42,37 @@ export function ItineraryEditor({
   service: MapsService | null;
   disabled?: boolean;
 }) {
-  const [targetId, setTargetId] = useState<string | null>(null);
   const [notesOpen, setNotesOpen] = useState<Record<string, boolean>>({});
+  const [mapOpen, setMapOpen] = useState(false);
+  const mapButton = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  // Return focus to the map icon after the popup closes.
+  useEffect(() => {
+    if (wasOpen.current && !mapOpen) mapButton.current?.focus();
+    wasOpen.current = mapOpen;
+  }, [mapOpen]);
   const stops = route.length - 2;
-  // Like NCore: map clicks set the chosen point, else the first point still without an address.
-  const explicit = route.findIndex((p) => p.id === targetId);
-  const firstEmpty = route.findIndex((p) => !p.address.trim());
-  const target = explicit >= 0 ? explicit : firstEmpty >= 0 ? firstEmpty : null;
+  const last = route.length - 1;
   const update = (i: number, p: TripPoint) =>
     onChange(route.map((q, n) => (n === i ? p : q)));
 
   return (
     <div className="itinerary">
       <div className="itinerary-toolbar">
+        {service?.google && (
+          <button
+            ref={mapButton}
+            type="button"
+            className="map-icon-button"
+            aria-label={`Open map to choose the ${leg} pickup point and drop-off`}
+            title="Choose pickup & drop-off on a map"
+            aria-haspopup="dialog"
+            disabled={disabled}
+            onClick={() => setMapOpen(true)}
+          >
+            <MapIcon size={20} aria-hidden="true" />
+          </button>
+        )}
         <button
           type="button"
           className="button small"
@@ -79,7 +97,6 @@ export function ItineraryEditor({
         {route.map((p, i) => {
           const kind = i === 0 ? "pickup" : i === route.length - 1 ? "dropoff" : "stop";
           const label = `${i + 1}. ${pointLabel(i, route.length)}`;
-          const isTarget = service && target === i && explicit === i;
           const showNotes = notesOpen[p.id] || !!p.notes;
           return (
             <li key={p.id} className={`itinerary-point ${kind}`}>
@@ -129,19 +146,6 @@ export function ItineraryEditor({
                 disabled={disabled}
               />
               <div className="itinerary-extras">
-                {service?.google && (
-                  <button
-                    type="button"
-                    className={`text-button ${isTarget ? "on" : ""}`}
-                    aria-pressed={!!isTarget}
-                    aria-label={`Set ${label} on the map`}
-                    disabled={disabled}
-                    onClick={() => setTargetId(isTarget ? null : p.id)}
-                  >
-                    <Crosshair size={14} aria-hidden="true" />
-                    {isTarget ? "Click the map…" : "Set on map"}
-                  </button>
-                )}
                 {!showNotes && (
                   <button
                     type="button"
@@ -174,18 +178,30 @@ export function ItineraryEditor({
           );
         })}
       </ol>
-      {service?.google && (
-        <RouteMap
+      {mapOpen && service?.google && (
+        <MapPickerDialog
+          leg={leg}
           service={service}
-          points={route}
-          target={target}
-          disabled={disabled}
-          title={`Map of your ${leg} journey`}
-          onPick={(i, place) => {
-            const current = route[i];
-            if (!current) return;
-            update(i, { ...current, ...place });
-            setTargetId(null);
+          pickup={route[0]}
+          dropoff={route[last]}
+          onClose={() => setMapOpen(false)}
+          onApply={(from, to) => {
+            const place = ({ name, address, lat, lng }: TripPoint) => ({
+              name,
+              address,
+              lat,
+              lng,
+            });
+            onChange(
+              route.map((p, n) =>
+                n === 0
+                  ? { ...p, ...place(from) }
+                  : n === last
+                    ? { ...p, ...place(to) }
+                    : p,
+              ),
+            );
+            setMapOpen(false);
           }}
         />
       )}
