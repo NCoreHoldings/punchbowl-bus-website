@@ -11,8 +11,9 @@ export const company = {
     "https://www.google.com/maps/search/?api=1&query=56+Hannans+Road+Riverwood+NSW+2210",
   source: "https://punchbowlbus.com.au",
   verified: "14 November 2026",
+  facebook: "https://www.facebook.com/profile.php?id=61593083106909",
   social: [
-    { label: "Facebook", href: "https://www.facebook.com/PunchbowlBus" },
+    { label: "Facebook", href: "https://www.facebook.com/profile.php?id=61593083106909" },
     { label: "X (Twitter)", href: "https://twitter.com/PunchbowlBusCo" },
   ],
 };

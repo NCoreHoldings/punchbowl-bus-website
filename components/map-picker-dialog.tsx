@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Info, X } from "lucide-react";
 import type { MapsService, SampleRoute } from "@/lib/google-maps";
 import { hasCoordinates, type TripPoint } from "@/lib/itinerary";
@@ -72,7 +73,9 @@ export function MapPickerDialog({
 
   const ready = !!from.address.trim() && !!to.address.trim();
   const points = [from, to];
-  return (
+  // Rendered into <body> so it sits above the fixed site header rather than
+  // inside the quote section's stacking context.
+  return createPortal(
     <div
       className="map-dialog-backdrop"
       onMouseDown={(e) => {
@@ -167,7 +170,8 @@ export function MapPickerDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

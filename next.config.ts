@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
   poweredByHeader: false,
+  // Job and banner files are read at request time when pages refresh hourly.
+  outputFileTracingIncludes: {
+    "/": ["./content/**/*"],
+    "/careers": ["./content/**/*"],
+    "/careers/*": ["./content/**/*"],
+    "/api/applications": ["./content/**/*"],
+    "/sitemap.xml": ["./content/**/*"],
+  },
   async headers() {
     return [
       {

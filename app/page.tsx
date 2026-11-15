@@ -3,61 +3,90 @@ import Image from "next/image";
 import { ArrowUpRight, ArrowRight, Phone } from "lucide-react";
 import { company, fleet, services } from "@/lib/content";
 import { CheckList, QuoteCTA, SectionHeading } from "@/components/common";
+import { HeroCarousel } from "@/components/hero-carousel";
+import { FacebookFeed } from "@/components/facebook-feed";
+import { activePromotions } from "@/lib/site-content";
+
+// Re-check banner start/end dates hourly without a redeploy.
+export const revalidate = 3600;
 
 export default function Home() {
+  const promotions = activePromotions().map(
+    ({
+      slug,
+      style,
+      title,
+      eyebrow,
+      text,
+      image,
+      imageAlt,
+      buttonLabel,
+      buttonLink,
+    }) => ({
+      slug,
+      style,
+      title,
+      eyebrow,
+      text,
+      image,
+      imageAlt,
+      buttonLabel,
+      buttonLink,
+    }),
+  );
   return (
     <>
-      <section className="home-hero">
-        <Image
-          className="hero-photo"
-          src="/images/punchbowl-coach.jpg"
-          alt="Punchbowl Bus Company coach in its red and cream livery"
-          fill
-          preload
-          sizes="100vw"
-        />
-        <div className="hero-shade" aria-hidden="true" />
-        <div className="wrap hero-content">
-          <span className="eyebrow light hero-eyebrow">
-            Sydney bus &amp; coach charters · Since 1947
-          </span>
-          <h1>
-            Travel together,
-            <span className="accent"> the Punchbowl way.</span>
-          </h1>
-          <p>
-            Modern buses seating up to 57 passengers and luxury coaches for
-            school charters, day trips and extended tours across Sydney and
-            beyond.
-          </p>
-          <div className="hero-actions">
-            <Link className="button" href="/request-a-quote">
-              Request a quote <ArrowUpRight size={18} aria-hidden="true" />
-            </Link>
-            <a className="button ghost" href={company.phoneHref}>
-              <Phone size={17} aria-hidden="true" /> {company.phone}
-            </a>
+      <HeroCarousel
+        introImage={{
+          src: "/images/punchbowl-coach.jpg",
+          alt: "Punchbowl Bus Company coach in its red and cream livery",
+        }}
+        slides={promotions}
+        intro={
+          <div className="wrap hero-content">
+            <span className="eyebrow light hero-eyebrow">
+              Sydney bus &amp; coach charters · Since 1947
+            </span>
+            <h1>
+              Travel together,
+              <span className="accent"> the Punchbowl way.</span>
+            </h1>
+            <p>
+              Modern buses seating up to 57 passengers and luxury coaches for
+              school charters, day trips and extended tours across Sydney and
+              beyond.
+            </p>
+            <div className="hero-actions">
+              <Link className="button" href="/request-a-quote">
+                Request a quote <ArrowUpRight size={18} aria-hidden="true" />
+              </Link>
+              <a className="button ghost" href={company.phoneHref}>
+                <Phone size={17} aria-hidden="true" /> {company.phone}
+              </a>
+            </div>
           </div>
-        </div>
-        <div className="wrap hero-stats" aria-label="At a glance">
-          <div>
-            <strong>1947</strong>
-            <span>Serving Sydney since</span>
+        }
+        footer={
+          <div className="wrap hero-stats" aria-label="At a glance">
+            <div>
+              <strong>1947</strong>
+              <span>Serving Sydney since</span>
+            </div>
+            <div>
+              <strong>57</strong>
+              <span>Seats per bus, up to</span>
+            </div>
+            <div>
+              <strong>ISO</strong>
+              <span>9001 · 14001 · 45001</span>
+            </div>
+            <div>
+              <strong>Local</strong>
+              <span>Australian owned &amp; operated</span>
+            </div>
           </div>
-          <div>
-            <strong>57</strong>
-            <span>Seats per bus, up to</span>
-          </div>
-          <div>
-            <strong>ISO</strong>
-            <span>9001 · 14001 · 45001</span>
-          </div>
-          <div>
-            <strong>Local</strong>
-            <span>Australian owned &amp; operated</span>
-          </div>
-        </div>
-      </section>
+        }
+      />
 
       <section className="section wrap">
         <SectionHeading
@@ -67,11 +96,7 @@ export default function Home() {
         />
         <div className="service-grid">
           {services.map((s) => (
-            <Link
-              key={s.key}
-              href={s.href}
-              className="service-card reveal"
-            >
+            <Link key={s.key} href={s.href} className="service-card reveal">
               <div className="service-media">
                 <Image
                   src={s.image}
@@ -136,24 +161,23 @@ export default function Home() {
             <span>01</span>
             <h3>Send your trip details</h3>
             <p>
-              Date, pickup point, destination, times, passenger numbers and
-              your choice of bus or coach.
+              Date, pickup point, destination, times, passenger numbers and your
+              choice of bus or coach.
             </p>
           </li>
           <li className="reveal">
             <span>02</span>
             <h3>Our charter team reviews it</h3>
             <p>
-              We check your requirements and get in touch to discuss your
-              quote.
+              We check your requirements and get in touch to discuss your quote.
             </p>
           </li>
           <li className="reveal">
             <span>03</span>
             <h3>Confirm and travel</h3>
             <p>
-              Once arrangements are confirmed with our team, your group is
-              ready to go.
+              Once arrangements are confirmed with our team, your group is ready
+              to go.
             </p>
           </li>
         </ol>
@@ -214,6 +238,7 @@ export default function Home() {
         </figure>
       </section>
 
+      <FacebookFeed pageUrl={company.facebook} />
       <QuoteCTA />
     </>
   );

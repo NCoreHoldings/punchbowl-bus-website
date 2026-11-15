@@ -77,6 +77,23 @@ NCore's prerequisites (its side, not this repo): migrations applied, Redis, `BUS
 
 When the domain moves, update `SITE_URL` and the integration's website in NCore.
 
+## Jobs, homepage banners & Facebook
+
+- **Careers:** `/careers` lists open vacancies from `content/careers/*.md`, or shows a "no vacancies" message. Each job has its own page, `/careers/<file-name>`, with an **Apply now** form: contact details, role-specific questions, a CV upload (PDF or Word, 4 MB maximum) and consent. The form is emailed with the CV attached to `admin@punchbowlbus.com.au`. Job pages include Google job-posting data.
+- **Homepage banners:** the hero is an accessible slideshow. The company introduction comes first, then the banners in `content/promotions/*.md`, each with optional start and end dates.
+- **Facebook:** the homepage shows the page's latest posts through Facebook's official Page Plugin. It loads only when visitors scroll near it.
+- **Editing:** staff edit these files on GitHub; see [content/README.md](content/README.md). Pages refresh hourly, so closing and end dates apply without a redeploy.
+
+To turn on emailed applications, create a free account at https://resend.com, verify `punchbowlbus.com.au` by adding the DNS records Resend gives you, and create an API key. Then set these in Vercel and redeploy:
+
+| Variable | Value |
+|---|---|
+| `RESEND_API_KEY` | The Resend API key |
+| `APPLICATIONS_FROM_EMAIL` | e.g. `Punchbowl Careers <careers@punchbowlbus.com.au>` (verified domain) |
+| `APPLICATIONS_TO_EMAIL` | Optional; defaults to `admin@punchbowlbus.com.au` |
+
+Until then, the Apply section asks applicants to email their CV instead. Applications also use the same Redis rate limiting as enquiries.
+
 ## Route planner & Google Maps
 
 The journey step uses an ordered itinerary like NCore Fleets' booking form: **pickup point → up to 20 passenger stops → drop-off**, with reordering, swapping endpoints, coach access notes per point, and a return leg that is either the outward route reversed or a custom route.

@@ -30,7 +30,14 @@ export function Heading({ text }: { text: string }) {
   );
 }
 
-export function PageHero({ info }: { info: PageInfo }) {
+export function PageHero({
+  info,
+  parent,
+}: {
+  info: PageInfo;
+  /** Optional middle breadcrumb, e.g. Careers on a job page. */
+  parent?: { title: string; href: string };
+}) {
   return (
     <section className="page-hero">
       <Image
@@ -46,6 +53,12 @@ export function PageHero({ info }: { info: PageInfo }) {
         <nav className="breadcrumb" aria-label="Breadcrumb">
           <Link href="/">Home</Link>
           <ChevronRight size={14} aria-hidden="true" />
+          {parent && (
+            <>
+              <Link href={parent.href}>{parent.title}</Link>
+              <ChevronRight size={14} aria-hidden="true" />
+            </>
+          )}
           <span aria-current="page">{info.title}</span>
         </nav>
         <span className="eyebrow light">{info.eyebrow}</span>
