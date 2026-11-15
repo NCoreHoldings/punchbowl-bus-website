@@ -69,15 +69,33 @@ NCore's prerequisites (its side, not this repo): migrations applied, Redis, `BUS
    | `NCORE_INTEGRATION_CREDENTIAL` | Credential from the NCore production integration |
    | `REDIS_URL` | Redis connection URL |
    | `TRUSTED_CLIENT_IP_HEADER` | `x-real-ip` (Vercel overwrites this header) |
+   | `GOOGLE_MAPS_BROWSER_KEY` | Optional. Google Maps browser key for address search and the route map (see below) |
+   | `GOOGLE_MAPS_MAP_ID` | Optional. Map ID from Google Cloud Map Management (`DEMO_MAP_ID` if empty) |
 
 4. Redeploy after changing variables. Open `/api/enquiries` with a GET request: it should return `{"available":true}`.
 5. Submit a clearly marked test enquiry and confirm it appears in NCore's Website enquiries inbox.
 
 When the domain moves, update `SITE_URL` and the integration's website in NCore.
 
+## Route planner & Google Maps
+
+The journey step uses an ordered itinerary like NCore Fleets' booking form: **pickup point → up to 20 passenger stops → drop-off**, with reordering, swapping endpoints, coach access notes per point, and a return leg that is either the outward route reversed or a custom route.
+
+With `GOOGLE_MAPS_BROWSER_KEY` set, each point gets Google Places search, and a map shows numbered pins and the route line. Customers can click the map to set a point or drag a pin to adjust it. Without the key, the same itinerary works with plain address fields.
+
+NCore receives each point's venue name, full address and access notes (`pickup`, `stops[]`, `destination`). Coordinates aren't part of NCore's website-enquiry contract, so they aren't sent; NCore geocodes the addresses itself.
+
+Google Cloud setup (https://console.cloud.google.com):
+
+1. Create or choose a project and enable billing.
+2. Enable the **Maps JavaScript API**, **Places API (New)** and **Geocoding API**.
+3. Create an API key under **APIs & Services → Credentials**. Restrict it by **websites (HTTP referrers)** to `http://localhost:3001/*`, `https://punchbowl-bus-website.vercel.app/*` and the final domain, and restrict it to those three APIs. The key is visible in the browser by design; these restrictions are what protect it.
+4. Optional: create a Map ID under **Map Management** and set `GOOGLE_MAPS_MAP_ID`.
+5. Set `GOOGLE_MAPS_BROWSER_KEY` in `.env.local` and in Vercel, then redeploy. `GET /api/enquiries` then includes a `maps` object.
+
 ## Assets
 
-All photos and badges are the company's own, from punchbowlbus.com.au: logo, coach (`IMAG0338.jpg`), Baylink bus (`BBG_0189_copy.jpg`), apprentice, heritage strip, ISO 9001/14001/45001 and Australian Owned & Operated badges. Fonts are Inter and Manrope (Fontsource, OFL), self-hosted, so pages make no third-party requests.
+All photos and badges are the company's own, from punchbowlbus.com.au: logo, coach (`IMAG0338.jpg`), Baylink bus (`BBG_0189_copy.jpg`), apprentice, heritage strip, ISO 9001/14001/45001 and Australian Owned & Operated badges. Fonts are Inter and Manrope (Fontsource, OFL), self-hosted. The only third-party requests are Google Maps on the quote page, when a key is configured.
 
 ## Security notes
 

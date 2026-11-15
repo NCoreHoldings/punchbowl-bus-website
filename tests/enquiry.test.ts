@@ -12,12 +12,16 @@ import {
 } from "../lib/form-data";
 import { websiteSubmissionSchema } from "../lib/enquiry-schema";
 import { restorePending } from "../lib/pending-request";
+import { newPoint, type TripPoint } from "../lib/itinerary";
+const route = (...addresses: string[]): TripPoint[] =>
+  addresses.map((address) => newPoint({ address }));
+const PICKUP = "10 Learning Street, Sydney NSW 2000";
+const DROPOFF = "20 Museum Street, Sydney NSW 2000";
 const form: TripForm = {
   ...emptyForm,
   date: "2035-05-14",
   time: "09:00",
-  pickup: "10 Learning Street, Sydney NSW 2000",
-  destination: "20 Museum Street, Sydney NSW 2000",
+  outbound: route(PICKUP, DROPOFF),
   passengerCount: "40",
   name: "Test coordinator",
   customerGroup: "Test school",
@@ -106,19 +110,40 @@ describe("Public form mapping and NCore contract", () => {
       },
       "request-2",
     );
-    expect(result.return?.pickup.address).toBe(form.destination);
-    expect(result.return?.destination.address).toBe(form.pickup);
+    expect(result.return?.pickup.address).toBe(DROPOFF);
+    expect(result.return?.destination.address).toBe(PICKUP);
     const override = buildSubmission(
       {
         ...form,
         tripType: "return",
         returnDate: "2035-05-15",
-        returnPickup: "30 Other Street",
-        returnDestination: "40 Home Street",
+        returnReversed: false,
+        inbound: route("30 Other Street", "40 Home Street"),
       },
       "request-3",
     );
     expect(override.return?.pickup.address).toBe("30 Other Street");
+  });
+  it("maps passenger stops in order, venue names and coach access notes", () => {
+    const outbound = [
+      newPoint({ name: "Punchbowl Public School", address: "1 School Rd, Punchbowl NSW 2196, Australia", notes: "Gate 3", lat: -33.92, lng: 151.05 }),
+      newPoint({ address: "5 Stop St, Bankstown NSW 2200" }),
+      newPoint({ name: "Museum", address: "Museum, 20 Museum St, Sydney NSW 2000" }),
+      newPoint({ address: DROPOFF }),
+    ];
+    const result = buildSubmission({ ...form, outbound, tripType: "return", returnDate: "2035-05-14", returnTime: "15:00" }, "stops");
+    expect(result.forward?.pickup).toEqual({ name: "Punchbowl Public School", address: "1 School Rd, Punchbowl NSW 2196, Australia", instructions: "Gate 3" });
+    expect(result.forward?.stops.map((s) => s.address)).toEqual(["5 Stop St, Bankstown NSW 2200", "Museum, 20 Museum St, Sydney NSW 2000"]);
+    // A name already at the start of the address isn't repeated; coordinates are never sent.
+    expect(result.forward?.stops[1]).toEqual({ address: "Museum, 20 Museum St, Sydney NSW 2000" });
+    expect(JSON.stringify(result)).not.toContain("151.05");
+    expect(result.return?.pickup.address).toBe(DROPOFF);
+    expect(result.return?.stops.map((s) => s.address)).toEqual(["Museum, 20 Museum St, Sydney NSW 2000", "5 Stop St, Bankstown NSW 2200"]);
+  });
+  it("names the empty point when an address is missing", () => {
+    expect(validateJourney({ ...form, outbound: route(PICKUP, "", DROPOFF) })).toMatch(/passenger stop 2/);
+    expect(validateJourney({ ...form, outbound: route("", DROPOFF) })).toMatch(/pickup point/);
+    expect(validateJourney({ ...form, tripType: "return", returnDate: "2035-05-15", returnReversed: false, inbound: route(DROPOFF, "") })).toMatch(/drop-off on the return/);
   });
   it("preserves vehicle, seatbelt and accessibility requests in special instructions", () => {
     const result = buildSubmission(

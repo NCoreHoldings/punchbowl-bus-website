@@ -9,18 +9,31 @@ import {
 } from "lucide-react";
 import {
   buildSubmission,
-  emptyForm,
+  freshForm,
+  returnRoute,
   sydneyToday,
   validateJourney,
   type TripForm,
 } from "@/lib/form-data";
+import {
+  loadGoogleMaps,
+  onMapsAuthFailure,
+  type MapsConfig,
+  type MapsService,
+} from "@/lib/google-maps";
+import { pointLabel, reverseRoute, type TripPoint } from "@/lib/itinerary";
+import { ItineraryEditor } from "./itinerary-editor";
 import { company } from "@/lib/content";
 import { restorePending, type PendingRequest } from "@/lib/pending-request";
 const STORAGE = "punchbowl-pending-enquiry-v1";
 type Pending = PendingRequest;
 type Receipt = { receiptId: string; receivedAt: string };
+type TextKey = {
+  [K in keyof TripForm]: TripForm[K] extends string ? K : never;
+}[keyof TripForm];
 export function EnquiryForm() {
-  const [form, setForm] = useState<TripForm>({ ...emptyForm });
+  const [form, setForm] = useState<TripForm>(freshForm);
+  const [maps, setMaps] = useState<MapsService | null>(null);
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +52,17 @@ export function EnquiryForm() {
     fetch("/api/enquiries", { cache: "no-store" })
       .then((r) => r.json())
       .then((v) => {
-        if (active) setAvailable(v.available === true);
+        if (!active) return;
+        setAvailable(v.available === true);
+        const config = v.maps as MapsConfig | null;
+        if (config?.key)
+          loadGoogleMaps(config)
+            .then((service) => {
+              if (active) setMaps(service);
+            })
+            .catch(() => {
+              /* Maps is optional: plain address fields remain. */
+            });
       })
       .catch(() => {
         if (active) setAvailable(false);
@@ -50,7 +73,7 @@ export function EnquiryForm() {
         const p = restorePending(saved);
         if (p) {
           pending.current = p;
-          setForm({ ...emptyForm, ...p.form });
+          setForm(p.form);
           setLocked(true);
           setStep(2);
           setConsent(true);
@@ -62,8 +85,10 @@ export function EnquiryForm() {
     } catch {
       /* Storage may be disabled; in-memory retries remain available. */
     }
+    const stopAuth = onMapsAuthFailure(() => setMaps(null));
     return () => {
       active = false;
+      stopAuth();
     };
   }, []);
   useEffect(() => {
@@ -74,7 +99,7 @@ export function EnquiryForm() {
   useEffect(() => {
     if (error) errorRef.current?.focus();
   }, [error]);
-  function update(key: keyof TripForm, value: string) {
+  function update<K extends keyof TripForm>(key: K, value: TripForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
     setError("");
   }
@@ -182,7 +207,7 @@ export function EnquiryForm() {
     }
   }
   const field = (
-    key: keyof TripForm,
+    key: TextKey,
     label: string,
     type = "text",
     required = false,
@@ -321,14 +346,16 @@ export function EnquiryForm() {
               <option value="return">Outward & return journey</option>
             </select>
           </label>
-          {field("pickup", "Pickup address", "text", true, true, {
-            autoComplete: "off",
-            placeholder: "Street address, suburb and postcode",
-          })}
-          {field("destination", "Destination address", "text", true, true, {
-            autoComplete: "off",
-            placeholder: "Street address, suburb and postcode",
-          })}
+          <div className="field full">
+            <span>Your route *</span>
+            <ItineraryEditor
+              leg="outward"
+              route={form.outbound}
+              onChange={(route) => update("outbound", route)}
+              service={maps}
+              disabled={locked || busy}
+            />
+          </div>
           {field("date", "Departure date", "date", true, false, {
             min: sydneyToday(),
           })}
@@ -338,31 +365,56 @@ export function EnquiryForm() {
               <div className="form-divider">
                 <h3>The journey home</h3>
                 <p>
-                  Leave return addresses blank to reverse your outward journey.
+                  By default we’ll drive your outward route in reverse.
                 </p>
               </div>
               {field("returnDate", "Return date", "date", true, false, {
                 min: form.date || sydneyToday(),
               })}
               {field("returnTime", "Return departure time (optional)", "time")}
-              {field(
-                "returnPickup",
-                "Return pickup (optional)",
-                "text",
-                false,
-                true,
-                {
-                  placeholder:
-                    form.destination || "Same as outward destination",
-                },
-              )}
-              {field(
-                "returnDestination",
-                "Return destination (optional)",
-                "text",
-                false,
-                true,
-                { placeholder: form.pickup || "Same as outward pickup" },
+              <label className="consent field full">
+                <input
+                  type="checkbox"
+                  checked={form.returnReversed}
+                  disabled={locked || busy}
+                  onChange={(e) => {
+                    const reversed = e.target.checked;
+                    setForm((f) => ({
+                      ...f,
+                      returnReversed: reversed,
+                      inbound:
+                        !reversed && !f.inbound.some((p) => p.address.trim())
+                          ? reverseRoute(f.outbound)
+                          : f.inbound,
+                    }));
+                    setError("");
+                  }}
+                />
+                <span>Return by the same route in reverse</span>
+              </label>
+              {form.returnReversed ? (
+                <p className="field full route-summary">
+                  {routeSummary(returnRoute(form))}
+                </p>
+              ) : (
+                <div className="field full">
+                  <span>Return route *</span>
+                  <ItineraryEditor
+                    leg="return"
+                    route={form.inbound}
+                    onChange={(route) => update("inbound", route)}
+                    service={maps}
+                    disabled={locked || busy}
+                  />
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={locked || busy}
+                    onClick={() => update("inbound", reverseRoute(form.outbound))}
+                  >
+                    Copy outward route in reverse
+                  </button>
+                </div>
               )}
             </>
           )}
@@ -466,13 +518,11 @@ export function EnquiryForm() {
                   : "Buses to be advised"}
               </dd>
             </div>
-            <div>
-              <dt>Pickup</dt>
-              <dd>{form.pickup}</dd>
-            </div>
-            <div>
-              <dt>Destination</dt>
-              <dd>{form.destination}</dd>
+            <div className="full">
+              <dt>Outward route</dt>
+              <dd>
+                <RouteList route={form.outbound} />
+              </dd>
             </div>
             <div>
               <dt>Departure (Sydney time)</dt>
@@ -489,13 +539,14 @@ export function EnquiryForm() {
                     {form.returnTime || "Time to be discussed"}
                   </dd>
                 </div>
-                <div>
-                  <dt>Return pickup</dt>
-                  <dd>{form.returnPickup || form.destination}</dd>
-                </div>
-                <div>
-                  <dt>Return destination</dt>
-                  <dd>{form.returnDestination || form.pickup}</dd>
+                <div className="full">
+                  <dt>
+                    Return route
+                    {form.returnReversed ? " (outward route reversed)" : ""}
+                  </dt>
+                  <dd>
+                    <RouteList route={returnRoute(form)} />
+                  </dd>
                 </div>
               </>
             )}
@@ -618,5 +669,30 @@ export function EnquiryForm() {
         </button>
       </div>
     </form>
+  );
+}
+
+function routeSummary(route: TripPoint[]) {
+  const named = route
+    .map((p) => p.name || p.address.split(",")[0].trim())
+    .filter(Boolean);
+  return named.length === route.length
+    ? `Return route: ${named.join(" → ")}`
+    : "Your return route will mirror the outward route once its addresses are set.";
+}
+function RouteList({ route }: { route: TripPoint[] }) {
+  return (
+    <ol className="review-route">
+      {route.map((p, i) => (
+        <li key={p.id}>
+          <span>
+            {i + 1}. {pointLabel(i, route.length)}
+          </span>
+          {p.name && !p.address.startsWith(p.name) && <strong>{p.name}</strong>}
+          {p.address}
+          {p.notes.trim() && <small>Access: {p.notes.trim()}</small>}
+        </li>
+      ))}
+    </ol>
   );
 }

@@ -1981,6 +1981,312 @@ textarea:disabled {
     flex-wrap: wrap;
   }
 }
+
+/* Route itinerary + Google Maps location picker (quote form) */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.itinerary {
+  display: grid;
+  gap: 14px;
+  font-weight: 400;
+}
+.itinerary-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.button.small {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.86rem;
+}
+.itinerary-count {
+  margin-left: auto;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.itinerary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.itinerary-point {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--ink);
+  border-radius: 12px;
+}
+.itinerary-point.pickup {
+  border-left-color: var(--ok);
+}
+.itinerary-point.dropoff {
+  border-left-color: var(--red);
+}
+.itinerary-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.itinerary-badge {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--white);
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pickup .itinerary-badge {
+  background: var(--ok);
+}
+.dropoff .itinerary-badge {
+  background: var(--red);
+}
+.itinerary-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-button:hover:not(:disabled) {
+  background: var(--cream);
+  color: var(--ink);
+}
+.icon-button.danger:hover:not(:disabled) {
+  background: var(--red-soft);
+  color: var(--red);
+}
+.icon-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.icon-button:focus-visible,
+.text-button:focus-visible {
+  outline: 3px solid rgb(181 31 43 / 0.35);
+  outline-offset: 2px;
+}
+.itinerary-extras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--red-dark);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 650;
+  cursor: pointer;
+  justify-self: start;
+}
+.text-button:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.text-button.on {
+  color: var(--white);
+  background: var(--red);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.text-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.itinerary-notes textarea {
+  min-height: 0;
+}
+.location-field {
+  position: relative;
+}
+.location-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.location-input > svg:first-child {
+  position: absolute;
+  left: 14px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.location-input input:not([type="checkbox"]) {
+  padding-left: 40px;
+  padding-right: 40px;
+}
+.location-input .loading-spinner {
+  position: absolute;
+  right: 14px;
+  color: var(--muted);
+}
+.location-options {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.location-options [role="option"] {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+.location-options [role="option"] span {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.location-options [role="option"]:hover,
+.location-options [role="option"].active {
+  background: var(--cream);
+}
+.location-empty {
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.location-attribution {
+  padding: 6px 12px 2px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: right;
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+}
+.location-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.location-status.ok {
+  color: var(--ok);
+}
+.route-map {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.route-map-canvas {
+  height: 340px;
+  width: 100%;
+  background: var(--cream);
+}
+.route-map-hint {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  max-width: calc(100% - 80px);
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.94);
+  box-shadow: var(--shadow);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  pointer-events: none;
+}
+.route-map-hint.picking {
+  background: var(--red);
+  color: var(--white);
+}
+.route-summary {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--cream);
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--text);
+}
+.form-grid > .consent.field {
+  flex-direction: row;
+  margin-top: 0;
+  font-weight: 400;
+}
+.review-route {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.review-route li {
+  display: grid;
+  gap: 2px;
+  white-space: normal;
+}
+.review-route span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.review-route small {
+  color: var(--muted);
+}
+@media (max-width: 600px) {
+  .itinerary-count {
+    margin-left: 0;
+    width: 100%;
+  }
+  .itinerary-point {
+    padding: 12px;
+  }
+  .route-map-canvas {
+    height: 280px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

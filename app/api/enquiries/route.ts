@@ -23,6 +23,14 @@ export async function GET() {
         process.env.NCORE_INTEGRATION_CREDENTIAL &&
         (process.env.NODE_ENV !== "production" || process.env.REDIS_URL),
       ),
+      // Browser key for Maps/Places. It is public by design: restrict it to
+      // this site's domains and the needed APIs in Google Cloud.
+      maps: process.env.GOOGLE_MAPS_BROWSER_KEY
+        ? {
+            key: process.env.GOOGLE_MAPS_BROWSER_KEY,
+            mapId: process.env.GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID",
+          }
+        : null,
     },
     { headers: { "Cache-Control": "no-store" } },
   );
