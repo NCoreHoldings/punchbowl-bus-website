@@ -26,12 +26,12 @@ export const navigation: NavItem[] = [
   { title: "Fleet", href: "/fleet" },
   { title: "Baylink Shuttle", href: "/baylink-shuttle" },
   { title: "About", href: "/about" },
+  { title: "Careers", href: "/careers" },
   { title: "Contact", href: "/contact" },
 ];
 
 export const secondaryNavigation: NavItem[] = [
   { title: "School & group travel", href: "/school-group-travel" },
-  { title: "Careers", href: "/careers" },
   { title: "Environment", href: "/environment" },
 ];
 

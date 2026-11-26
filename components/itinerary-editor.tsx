@@ -18,6 +18,8 @@ import {
   pointLabel,
   removeStop,
   swapEndpoints,
+  legName,
+  type Leg,
   type TripPoint,
 } from "@/lib/itinerary";
 import { LocationField } from "./location-field";
@@ -36,7 +38,7 @@ export function ItineraryEditor({
   disabled,
 }: {
   /** "outward" or "return" — used for labels and input names. */
-  leg: "outward" | "return";
+  leg: Leg;
   route: TripPoint[];
   onChange: (route: TripPoint[]) => void;
   service: MapsService | null;
@@ -64,7 +66,7 @@ export function ItineraryEditor({
             ref={mapButton}
             type="button"
             className="map-icon-button"
-            aria-label={`Open map to choose the ${leg} pickup point and drop-off`}
+            aria-label={`Open map to choose the ${legName(leg)} pickup point and drop-off`}
             title="Choose pickup & drop-off on a map"
             aria-haspopup="dialog"
             disabled={disabled}
@@ -138,7 +140,7 @@ export function ItineraryEditor({
                 </span>
               </div>
               <LocationField
-                label={`${leg === "return" ? "Return " : ""}${label}`}
+                label={`${leg === "return" ? "Return " : leg.startsWith("bus-") ? `Bus ${leg.slice(4)} ` : ""}${label}`}
                 name={`${leg}-${i}`}
                 value={p}
                 onChange={(v) => update(i, v)}

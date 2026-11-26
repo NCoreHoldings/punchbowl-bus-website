@@ -380,6 +380,7 @@ a:hover > .text-link svg {
   font-weight: 600;
   font-size: 0.95rem;
   border-radius: 999px;
+  white-space: nowrap;
   transition: background 0.2s;
 }
 .desktop-nav a::after {
@@ -1618,6 +1619,119 @@ textarea:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+/* Trip type cards and weekday chips (radio/checkbox inputs stay focusable). */
+fieldset.field {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+fieldset.field > legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
+.trip-type-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.trip-type,
+.weekdays label {
+  position: relative;
+  cursor: pointer;
+}
+.trip-type input,
+.weekdays input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+.trip-type > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  height: 100%;
+  padding: 13px 14px;
+  border: 1.5px solid #d6d0c3;
+  border-radius: 10px;
+  background: var(--paper);
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    box-shadow 0.2s;
+}
+.trip-type small {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.trip-type:hover > span,
+.weekdays label:hover > span {
+  border-color: #b9b2a3;
+}
+.trip-type input:checked + span,
+.weekdays input:checked + span {
+  border-color: var(--red);
+  background: var(--white);
+  box-shadow: inset 0 0 0 1px var(--red);
+}
+.trip-type input:focus-visible + span,
+.weekdays input:focus-visible + span {
+  box-shadow: 0 0 0 4px rgb(181 31 43 / 0.14);
+}
+.trip-type input:disabled + span,
+.weekdays input:disabled + span {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.weekdays > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.weekdays label > span {
+  display: grid;
+  place-items: center;
+  min-width: 56px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1.5px solid #d6d0c3;
+  border-radius: 999px;
+  background: var(--paper);
+  font-weight: 650;
+}
+.weekdays input:checked + span {
+  color: var(--red);
+}
+.trip-type-options.two {
+  grid-template-columns: 1fr 1fr;
+}
+/* Buses 2..N with their own route. */
+.bus-route {
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+}
+.bus-route-times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 20px;
+  margin-top: 6px;
+}
+@media (max-width: 900px) {
+  .trip-type-options {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .trip-type-options.two,
+  .bus-route-times {
+    grid-template-columns: 1fr;
+  }
+}
 .form-divider {
   border-top: 1px solid var(--line);
   padding-top: 26px;
@@ -1783,7 +1897,8 @@ textarea:disabled {
     gap: 20px;
   }
 }
-@media (max-width: 1060px) {
+/* Header menu: the seven links and the quote button need about 1,085px. */
+@media (max-width: 1100px) {
   .desktop-nav,
   .header-quote {
     display: none;
@@ -1826,6 +1941,8 @@ textarea:disabled {
     gap: 8px;
     border: 0 !important;
   }
+}
+@media (max-width: 1060px) {
   .feature-grid.four {
     grid-template-columns: 1fr 1fr;
   }

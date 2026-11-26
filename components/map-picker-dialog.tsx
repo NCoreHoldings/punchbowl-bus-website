@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Info, X } from "lucide-react";
 import type { MapsService, SampleRoute } from "@/lib/google-maps";
-import { hasCoordinates, type TripPoint } from "@/lib/itinerary";
+import { hasCoordinates, legName, type Leg, type TripPoint } from "@/lib/itinerary";
 import { LocationField } from "./location-field";
 import { RouteMap } from "./route-map";
 
@@ -19,7 +19,7 @@ export function MapPickerDialog({
   onApply,
   onClose,
 }: {
-  leg: "outward" | "return";
+  leg: Leg;
   pickup: TripPoint;
   dropoff: TripPoint;
   service: MapsService;
@@ -92,7 +92,12 @@ export function MapPickerDialog({
       >
         <div className="map-dialog-head">
           <h3 id={titleId}>
-            {leg === "return" ? "Return journey" : "Your journey"} on the map
+            {leg === "return"
+              ? "Return journey"
+              : leg === "outward"
+                ? "Your journey"
+                : `Bus ${leg.slice(4)} route`}{" "}
+            on the map
           </h3>
           <button
             type="button"
@@ -136,7 +141,7 @@ export function MapPickerDialog({
               service={service}
               points={points}
               target={!from.address.trim() ? 0 : !to.address.trim() ? 1 : null}
-              title={`Map of the ${leg} pickup point and drop-off`}
+              title={`Map of the ${legName(leg)} pickup point and drop-off`}
               sampleRoute
               onRouteInfo={(r, loading) => {
                 setRoute(r);
