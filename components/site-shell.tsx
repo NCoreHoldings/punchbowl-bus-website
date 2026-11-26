@@ -109,7 +109,7 @@ export function Header() {
               <Link
                 key={href}
                 href={href}
-                aria-current={path === href ? "page" : undefined}
+                aria-current={isActive(path, href) ? "page" : undefined}
               >
                 {title}
                 <ArrowUpRight size={18} aria-hidden="true" />

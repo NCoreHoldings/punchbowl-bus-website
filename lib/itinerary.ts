@@ -16,6 +16,13 @@ export type TripPoint = {
 };
 
 export const MAX_STOPS = 20;
+
+/** Which route an editor shows: the outward or return leg, or bus N's own route. */
+export type Leg = "outward" | "return" | `bus-${number}`;
+/** "outward", "return" or "bus 2", for labels. */
+export function legName(leg: Leg) {
+  return leg.startsWith("bus-") ? `bus ${leg.slice(4)}` : leg;
+}
 export const MAX_POINTS = MAX_STOPS + 2;
 
 let counter = 0;

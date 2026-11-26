@@ -5,7 +5,9 @@ import {
 } from "../lib/enquiry-handler";
 import {
   buildSubmission,
+  countInput,
   emptyForm,
+  withBusRoutes,
   validateJourney,
   sydneyToday,
   type TripForm,
@@ -104,7 +106,7 @@ describe("Public form mapping and NCore contract", () => {
     const result = buildSubmission(
       {
         ...form,
-        tripType: "return",
+        tripType: "round_trip",
         returnDate: "2035-05-14",
         returnTime: "15:00",
       },
@@ -115,7 +117,7 @@ describe("Public form mapping and NCore contract", () => {
     const override = buildSubmission(
       {
         ...form,
-        tripType: "return",
+        tripType: "round_trip",
         returnDate: "2035-05-15",
         returnReversed: false,
         inbound: route("30 Other Street", "40 Home Street"),
@@ -124,6 +126,165 @@ describe("Public form mapping and NCore contract", () => {
     );
     expect(override.return?.pickup.address).toBe("30 Other Street");
   });
+  it("sends NCore's booking type for every trip type", () => {
+    expect(buildSubmission(form, "t1")).toMatchObject({
+      schemaVersion: 2,
+      tripType: "one_way",
+      return: null,
+      recurrence: null,
+    });
+    // Return details left over from another type are never sent.
+    const leftover = { ...form, returnDate: "2035-05-15" };
+    expect(
+      buildSubmission({ ...leftover, tripType: "shuttle" }, "t2").return,
+    ).toBeNull();
+  });
+  it("maps a recurring trip's schedule and checks it like New Booking", () => {
+    const weekly: TripForm = {
+      ...form,
+      tripType: "repeatable",
+      recurrenceType: "weekly",
+      recurrenceDays: [3, 1],
+      recurrenceEndDate: "2035-08-30",
+    };
+    expect(validateJourney(weekly)).toBeNull();
+    expect(buildSubmission(weekly, "r1")).toMatchObject({
+      tripType: "repeatable",
+      return: null,
+      forward: { date: "2035-05-14", time: "09:00" },
+      recurrence: { type: "weekly", days: [1, 3], endDate: "2035-08-30" },
+    });
+    expect(
+      buildSubmission({ ...weekly, recurrenceType: "monthly" }, "r2").recurrence,
+    ).toEqual({ type: "monthly", days: [], endDate: "2035-08-30" });
+    expect(validateJourney({ ...weekly, recurrenceDays: [] })).toMatch(
+      /day of the week/,
+    );
+    expect(validateJourney({ ...weekly, recurrenceEndDate: "" })).toMatch(
+      /last trip/,
+    );
+    expect(
+      validateJourney({ ...weekly, recurrenceEndDate: "2035-05-13" }),
+    ).toMatch(/last trip/);
+    expect(
+      validateJourney({ ...weekly, recurrenceEndDate: "2036-05-15" }),
+    ).toMatch(/up to one year/);
+  });
+  it("maps a shuttle's time window to the first pickup and final arrival", () => {
+    const shuttle: TripForm = {
+      ...form,
+      tripType: "shuttle",
+      passengerCount: "300",
+      finishTime: "11:30",
+    };
+    expect(validateJourney(shuttle)).toBeNull();
+    expect(buildSubmission(shuttle, "s1")).toMatchObject({
+      tripType: "shuttle",
+      passengerCount: 300,
+      forward: {
+        date: "2035-05-14",
+        time: "09:00",
+        arrivalDate: "2035-05-14",
+        arrivalTime: "11:30",
+      },
+    });
+    expect(validateJourney({ ...shuttle, finishTime: "08:00" })).toMatch(
+      /finish time/,
+    );
+    expect(
+      buildSubmission({ ...shuttle, finishTime: "" }, "s2").forward,
+    ).toMatchObject({ arrivalDate: null, arrivalTime: null });
+  });
+  it("accepts typed counts as whole numbers only", () => {
+    expect(countInput("12", 5)).toBe("12");
+    expect(countInput("1e3", 5)).toBe("13");
+    expect(countInput("-4.5 people", 5)).toBe("45");
+    expect(countInput("007", 5)).toBe("7");
+    expect(countInput("0", 5)).toBe("0");
+    expect(countInput("123456", 5)).toBe("12345");
+    expect(validateJourney({ ...form, passengerCount: "0" })).toMatch(
+      /passenger count/,
+    );
+    expect(validateJourney({ ...form, busCount: "101" })).toMatch(/100 buses/);
+  });
+  it("sends a different route for each bus and drops the seat belt question", () => {
+    const two = withBusRoutes({
+      ...form,
+      tripType: "round_trip",
+      returnDate: "2035-05-14",
+      returnTime: "15:00",
+      busCount: "2",
+      routeMode: "different",
+      seatbelts: "Required",
+    });
+    const bus2 = { ...two.busRoutes[0], route: route("30 Second School Rd", DROPOFF) };
+    expect(validateJourney(two)).toMatch(/pickup point on the route for bus 2/);
+    const ready = { ...two, busRoutes: [{ ...bus2, time: "08:30" }] };
+    expect(validateJourney(ready)).toBeNull();
+    const result = buildSubmission(ready, "b1");
+    expect(result.busCount).toBe(2);
+    expect(result.otherBuses).toEqual([
+      {
+        time: "08:30",
+        returnTime: "15:00",
+        pickup: { address: "30 Second School Rd" },
+        destination: { address: DROPOFF },
+        stops: [],
+      },
+    ]);
+    expect(result.specialInstructions).not.toMatch(/Seatbelt/);
+    expect(
+      validateJourney({ ...ready, busRoutes: [{ ...bus2, time: "16:00" }] }),
+    ).toMatch(/return time for bus 2/);
+    // The same choice with one shared route keeps the seat belt question.
+    const same = buildSubmission({ ...ready, routeMode: "same" }, "b2");
+    expect(same.otherBuses).toBeNull();
+    expect(same.specialInstructions).toMatch(/Seatbelt preference: Required/);
+    // Shuttles always share one route.
+    expect(
+      buildSubmission({ ...ready, tripType: "shuttle" }, "b3").otherBuses,
+    ).toBeNull();
+    // Bus 2 with no time of its own leaves with bus 1.
+    expect(
+      buildSubmission({ ...ready, busRoutes: [bus2] }, "b4").otherBuses?.[0]
+        .time,
+    ).toBe("09:00");
+    expect(
+      validateJourney(withBusRoutes({ ...ready, busCount: "21" })),
+    ).toMatch(/up to 20 buses/);
+  });
+  it("needs a weekly trip's first date to be one of its days, as NCore schedules", () => {
+    // 2035-05-14 is a Monday.
+    expect(
+      validateJourney({
+        ...form,
+        tripType: "repeatable",
+        recurrenceType: "weekly",
+        recurrenceDays: [3],
+        recurrenceEndDate: "2035-06-30",
+      }),
+    ).toMatch(/first trip is on a Monday/);
+  });
+  it("keeps the contract's trip type rules consistent with the legs", () => {
+    const base = buildSubmission(form, "c1");
+    const bad = [
+      { ...base, schemaVersion: 1 },
+      { ...base, tripType: "round_trip" },
+      { ...base, tripType: "repeatable" },
+      { ...base, tripType: "shuttle", passengerCount: null },
+      {
+        ...base,
+        recurrence: { type: "daily", days: [], endDate: "2035-06-01" },
+      },
+    ];
+    for (const v of bad)
+      expect(websiteSubmissionSchema.safeParse(v).success).toBe(false);
+    // Version 1 enquiries without a trip type stay valid.
+    const { tripType: _t, recurrence: _r, ...v1 } = base;
+    expect(
+      websiteSubmissionSchema.safeParse({ ...v1, schemaVersion: 1 }).success,
+    ).toBe(true);
+  });
   it("maps passenger stops in order, venue names and coach access notes", () => {
     const outbound = [
       newPoint({ name: "Punchbowl Public School", address: "1 School Rd, Punchbowl NSW 2196, Australia", notes: "Gate 3", lat: -33.92, lng: 151.05 }),
@@ -131,7 +292,7 @@ describe("Public form mapping and NCore contract", () => {
       newPoint({ name: "Museum", address: "Museum, 20 Museum St, Sydney NSW 2000" }),
       newPoint({ address: DROPOFF }),
     ];
-    const result = buildSubmission({ ...form, outbound, tripType: "return", returnDate: "2035-05-14", returnTime: "15:00" }, "stops");
+    const result = buildSubmission({ ...form, outbound, tripType: "round_trip", returnDate: "2035-05-14", returnTime: "15:00" }, "stops");
     expect(result.forward?.pickup).toEqual({ name: "Punchbowl Public School", address: "1 School Rd, Punchbowl NSW 2196, Australia", instructions: "Gate 3" });
     expect(result.forward?.stops.map((s) => s.address)).toEqual(["5 Stop St, Bankstown NSW 2200", "Museum, 20 Museum St, Sydney NSW 2000"]);
     // A name already at the start of the address isn't repeated; coordinates are never sent.
@@ -143,7 +304,7 @@ describe("Public form mapping and NCore contract", () => {
   it("names the empty point when an address is missing", () => {
     expect(validateJourney({ ...form, outbound: route(PICKUP, "", DROPOFF) })).toMatch(/passenger stop 2/);
     expect(validateJourney({ ...form, outbound: route("", DROPOFF) })).toMatch(/pickup point/);
-    expect(validateJourney({ ...form, tripType: "return", returnDate: "2035-05-15", returnReversed: false, inbound: route(DROPOFF, "") })).toMatch(/drop-off on the return/);
+    expect(validateJourney({ ...form, tripType: "round_trip", returnDate: "2035-05-15", returnReversed: false, inbound: route(DROPOFF, "") })).toMatch(/drop-off on the return/);
   });
   it("preserves vehicle, seatbelt and accessibility requests in special instructions", () => {
     const result = buildSubmission(
@@ -173,7 +334,7 @@ describe("Public form mapping and NCore contract", () => {
     expect(
       validateJourney({
         ...form,
-        tripType: "return",
+        tripType: "round_trip",
         returnDate: "2035-05-13",
       }),
     ).toBeTruthy();
