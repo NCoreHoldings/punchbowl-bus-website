@@ -43,17 +43,17 @@ describe("Quote request PDF", () => {
   it("lays out the request like the review step", () => {
     const sections = requestSections(form);
     expect(sections.map((s) => s.title)).toEqual([
+      "Contact details",
       "Trip overview",
       "Schedule",
       "Routes",
-      "Contact details",
       "Additional details",
     ]);
     const routes = sections.find((s) => s.kind === "route");
     expect(routes?.kind === "route" && routes.routes.map((r) => r.title)).toEqual(
       ["Outward route", "Return route"],
     );
-    const schedule = sections[1].kind === "rows" ? sections[1].rows : [];
+    const schedule = sections[2].kind === "rows" ? sections[2].rows : [];
     expect(schedule).toContainEqual({
       label: "Departure date",
       value: "Monday 14 May 2035",

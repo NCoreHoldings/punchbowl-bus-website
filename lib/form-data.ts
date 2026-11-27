@@ -82,7 +82,6 @@ export type TripForm = {
   /** Buses 2..N; drafts beyond the bus count are kept but not sent. */
   busRoutes: BusRoute[];
   vehicle: string;
-  seatbelts: string;
   name: string;
   customerGroup: string;
   email: string;
@@ -108,7 +107,6 @@ export const emptyForm: TripForm = {
   routeMode: "same",
   busRoutes: [],
   vehicle: "No preference",
-  seatbelts: "Please discuss",
   name: "",
   customerGroup: "",
   email: "",
@@ -163,7 +161,6 @@ export const tripFormSchema = z.object({
     )
     .max(MAX_SEPARATE_ROUTE_BUSES),
   vehicle: z.string(),
-  seatbelts: z.string(),
   name: z.string(),
   customerGroup: z.string(),
   email: z.string(),
@@ -201,6 +198,13 @@ export function activeBusRoutes(form: TripForm): BusRoute[] {
   return form.busRoutes.slice(0, Math.max(0, count - 1));
 }
 
+/** The vehicle choices, as in NCore's New Booking "Vehicle type". */
+export const VEHICLE_OPTIONS = [
+  { value: "No preference", hint: "Our team will advise" },
+  { value: "Coach", hint: "Long-distance comfort" },
+  { value: "Bus", hint: "Charter and school transfers" },
+] as const;
+
 /** Adds route drafts so every bus 2..N has one. */
 export function withBusRoutes(form: TripForm): TripForm {
   const count = Math.min(Number(form.busCount) || 0, MAX_SEPARATE_ROUTE_BUSES);
@@ -209,6 +213,79 @@ export function withBusRoutes(form: TripForm): TripForm {
   while (busRoutes.length < count - 1)
     busRoutes.push({ id: pointId(), route: emptyRoute(), time: "", returnTime: "" });
   return { ...form, busRoutes };
+}
+
+/** One more bus with its own (empty) route, as "Add another bus" does. */
+export function addBus(form: TripForm): TripForm {
+  const count = Math.max(Number(form.busCount) || 1, 1);
+  if (count >= MAX_SEPARATE_ROUTE_BUSES) return form;
+  return withBusRoutes({
+    ...form,
+    busCount: String(count + 1),
+    routeMode: "different",
+  });
+}
+
+/** Removes bus `id` (one of buses 2..N) and its route. */
+export function removeBus(form: TripForm, id: string): TripForm {
+  const count = Number(form.busCount) || 0;
+  if (count < 2 || !activeBusRoutes(form).some((b) => b.id === id))
+    return form;
+  return {
+    ...form,
+    busCount: String(count - 1),
+    busRoutes: form.busRoutes.filter((b) => b.id !== id),
+  };
+}
+
+/** A fresh copy of a route, so editing one bus never changes another. */
+export function copyRoute(route: TripPoint[]): TripPoint[] {
+  return route.map((p) => ({ ...p, id: pointId() }));
+}
+
+/** True when every address on the route is filled in. */
+export function routeFilled(route: TripPoint[]) {
+  return route.every((p) => p.address.trim());
+}
+
+/** Same stops in the same order (ignores point IDs). */
+export function sameRoute(a: TripPoint[], b: TripPoint[]) {
+  const key = (r: TripPoint[]) =>
+    JSON.stringify(r.map((p) => [p.name, p.address.trim(), p.notes.trim()]));
+  return key(a) === key(b);
+}
+
+/** "Pickup → Drop-off (2 stops)" for summaries. */
+export function routeLine(route: TripPoint[]) {
+  const name = (p: TripPoint) =>
+    p.name || p.address.split(",")[0].trim() || "Not set";
+  const stops = route.length - 2;
+  return `${name(route[0])} → ${name(route[route.length - 1])}${
+    stops ? ` (${stops} stop${stops > 1 ? "s" : ""})` : ""
+  }`;
+}
+
+/** Basic details step: contact, passengers and buses. */
+export function validateBasics(form: TripForm): string | null {
+  if (!form.name.trim()) return "Please enter your contact name.";
+  if (!form.email.trim() && !form.phone.trim())
+    return "Please enter an email address or phone number so we can contact you.";
+  if (form.email.trim() && !z.email().safeParse(form.email.trim()).success)
+    return "Please check your email address.";
+  if (
+    !Number.isInteger(Number(form.passengerCount)) ||
+    Number(form.passengerCount) < 1 ||
+    Number(form.passengerCount) > 10000
+  )
+    return "Enter a passenger count between 1 and 10,000.";
+  if (
+    form.busCount &&
+    (!Number.isInteger(Number(form.busCount)) ||
+      Number(form.busCount) < 1 ||
+      Number(form.busCount) > 100)
+  )
+    return "Enter between 1 and 100 buses, or leave this blank.";
+  return null;
 }
 
 /** The return itinerary actually requested. */
@@ -291,11 +368,6 @@ function journey(form: TripForm) {
   };
 }
 
-/** Seat belts are asked only when every bus follows the same route. */
-export function asksSeatbelts(form: TripForm) {
-  return !differentRoutes(form);
-}
-
 export function buildSubmission(form: TripForm, id: string): WebsiteSubmission {
   return websiteSubmissionSchema.parse({
     schemaVersion: 2,
@@ -309,12 +381,8 @@ export function buildSubmission(form: TripForm, id: string): WebsiteSubmission {
     ...journey(form),
     passengerCount: Number(form.passengerCount),
     specialInstructions:
-      [
-        `Vehicle preference: ${form.vehicle}`,
-        ...(asksSeatbelts(form)
-          ? [`Seatbelt preference: ${form.seatbelts}`]
-          : []),
-      ].join("\n") + (form.notes.trim() ? `\n\n${form.notes.trim()}` : ""),
+      `Vehicle preference: ${form.vehicle}` +
+      (form.notes.trim() ? `\n\n${form.notes.trim()}` : ""),
   });
 }
 

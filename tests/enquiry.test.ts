@@ -207,7 +207,7 @@ describe("Public form mapping and NCore contract", () => {
     );
     expect(validateJourney({ ...form, busCount: "101" })).toMatch(/100 buses/);
   });
-  it("sends a different route for each bus and drops the seat belt question", () => {
+  it("sends a different route for each bus", () => {
     const two = withBusRoutes({
       ...form,
       tripType: "round_trip",
@@ -215,7 +215,6 @@ describe("Public form mapping and NCore contract", () => {
       returnTime: "15:00",
       busCount: "2",
       routeMode: "different",
-      seatbelts: "Required",
     });
     const bus2 = { ...two.busRoutes[0], route: route("30 Second School Rd", DROPOFF) };
     expect(validateJourney(two)).toMatch(/pickup point on the route for bus 2/);
@@ -232,14 +231,12 @@ describe("Public form mapping and NCore contract", () => {
         stops: [],
       },
     ]);
-    expect(result.specialInstructions).not.toMatch(/Seatbelt/);
     expect(
       validateJourney({ ...ready, busRoutes: [{ ...bus2, time: "16:00" }] }),
     ).toMatch(/return time for bus 2/);
-    // The same choice with one shared route keeps the seat belt question.
+    // With one shared route, no other buses are sent.
     const same = buildSubmission({ ...ready, routeMode: "same" }, "b2");
     expect(same.otherBuses).toBeNull();
-    expect(same.specialInstructions).toMatch(/Seatbelt preference: Required/);
     // Shuttles always share one route.
     expect(
       buildSubmission({ ...ready, tripType: "shuttle" }, "b3").otherBuses,
@@ -306,18 +303,17 @@ describe("Public form mapping and NCore contract", () => {
     expect(validateJourney({ ...form, outbound: route("", DROPOFF) })).toMatch(/pickup point/);
     expect(validateJourney({ ...form, tripType: "round_trip", returnDate: "2035-05-15", returnReversed: false, inbound: route(DROPOFF, "") })).toMatch(/drop-off on the return/);
   });
-  it("preserves vehicle, seatbelt and accessibility requests in special instructions", () => {
+  it("preserves vehicle and accessibility requests in special instructions, with no seat belt question", () => {
     const result = buildSubmission(
       {
         ...form,
         vehicle: "Coach",
-        seatbelts: "Required",
         notes: "Wheelchair access to be discussed",
       },
       "request-4",
     );
-    expect(result.specialInstructions).toContain("Coach");
-    expect(result.specialInstructions).toContain("Required");
+    expect(result.specialInstructions).toContain("Vehicle preference: Coach");
+    expect(result.specialInstructions).not.toMatch(/seat ?belt/i);
     expect(result.specialInstructions).toContain("Wheelchair access");
   });
   it("accepts phone-only contact and uses an individual name when no group is supplied", () => {

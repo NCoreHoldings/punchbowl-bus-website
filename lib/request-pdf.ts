@@ -2,7 +2,6 @@ import type { jsPDF } from "jspdf";
 import { company } from "./content";
 import {
   activeBusRoutes,
-  asksSeatbelts,
   differentRoutes,
   RECURRENCE_OPTIONS,
   returnRoute,
@@ -92,8 +91,6 @@ export function requestSections(form: TripForm): PdfSection[] {
     },
     { label: "Vehicle preference", value: form.vehicle },
   ];
-  if (asksSeatbelts(form))
-    trip.push({ label: "Seat belts", value: form.seatbelts });
 
   const schedule: PdfRow[] = [
     { label: `${DATE_LABEL[form.tripType]}`, value: longDate(form.date) },
@@ -167,10 +164,10 @@ export function requestSections(form: TripForm): PdfSection[] {
   if (form.phone) contact.push({ label: "Phone", value: form.phone });
 
   const sections: PdfSection[] = [
+    { kind: "rows", title: "Contact details", rows: contact },
     { kind: "rows", title: "Trip overview", rows: trip },
     { kind: "rows", title: "Schedule", rows: schedule },
     { kind: "route", title: routes.length > 1 ? "Routes" : "Route", routes },
-    { kind: "rows", title: "Contact details", rows: contact },
   ];
   if (form.notes.trim())
     sections.push({
