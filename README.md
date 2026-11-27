@@ -42,8 +42,8 @@ Browser ──POST /api/enquiries──▶ this site (server) ──POST /api/v1
 - The customer never logs in. The browser only talks to this site's `/api/enquiries`. The NCore credential stays on the server and never reaches client JavaScript.
 - **Tenant identification:** each NCore website-integration credential belongs to exactly one company installation. NCore links the enquiry to that company from the credential. The payload contains no tenant ID, and NCore rejects any unknown keys.
 - **Duplicate prevention:** every submission carries a stable `sourceSubmissionId`. Retries resend identical bytes, so NCore returns the original receipt (200) instead of creating a duplicate. Double-clicks are blocked in the UI.
-- **Trip types (contract version 2):** the form offers the same four types as NCore's New Booking form: One way, Round trip, Recurring and Shuttle. It sends `tripType` (`one_way`, `round_trip`, `repeatable`, `shuttle`). Recurring trips add `recurrence` (`daily`, `weekly` with weekdays, or `monthly`, plus the last trip date, up to one year). Shuttles send the first pickup as `forward.time` and "everyone delivered by" as `forward.arrivalTime`. NCore prefills New Booking with that type, schedule and a default seat capacity. With two or more buses (not shuttles), customers can choose a different route for each bus: buses 2..N are sent as `otherBuses` (own route and departure time, plus a return time on round trips) and open in New Booking as "Different route for each vehicle". The seat belt question is hidden in that case. Weekly recurring trips must start on one of their chosen weekdays, because NCore only schedules those days. NCore still accepts version 1 enquiries, so **deploy the NCore backend before this website**.
-- **Field mapping:** trip type → `forward`/`return` legs; pickup/destination → place addresses; date/times → `date`/`time`/`arrivalDate`/`arrivalTime` (Australia/Sydney); passengers/buses → `passengerCount`/`busCount`; contact → `contact`; vehicle preference, seatbelt requirement and notes → `specialInstructions`.
+- **Trip types (contract version 2):** the form offers the same four types as NCore's New Booking form: One way, Round trip, Recurring and Shuttle. It sends `tripType` (`one_way`, `round_trip`, `repeatable`, `shuttle`). Recurring trips add `recurrence` (`daily`, `weekly` with weekdays, or `monthly`, plus the last trip date, up to one year). Shuttles send the first pickup as `forward.time` and "everyone delivered by" as `forward.arrivalTime`. NCore prefills New Booking with that type, schedule and a default seat capacity. With two or more buses (not shuttles), customers can choose a different route for each bus: buses 2..N are sent as `otherBuses` (own route and departure time, plus a return time on round trips) and open in New Booking as "Different route for each vehicle". Weekly recurring trips must start on one of their chosen weekdays, because NCore only schedules those days. NCore still accepts version 1 enquiries, so **deploy the NCore backend before this website**.
+- **Field mapping:** trip type → `forward`/`return` legs; pickup/destination → place addresses; date/times → `date`/`time`/`arrivalDate`/`arrivalTime` (Australia/Sydney); passengers/buses → `passengerCount`/`busCount`; contact → `contact`; vehicle type and trip notes → `specialInstructions`. The form has no seat belt question; customers mention seat belt needs in their notes.
 - **Abuse controls:** exact `Origin` match with `SITE_URL`, JSON-only, a 64 KiB streaming body limit, a strict schema, a honeypot field and Redis rate limiting (10/min per client IP, or 30/min global without a trusted IP header). The upstream call has a 15 s timeout and refuses redirects. Production requires an HTTPS upstream.
 - Received enquiries appear in **NCore → Charter Management → Website enquiries** for staff review and conversion to a draft booking. Nothing is auto-confirmed.
 - If the integration isn't configured, the form shows an "unavailable, please call" notice. It never shows a fake receipt.
@@ -94,6 +94,14 @@ To turn on emailed applications, create a free account at https://resend.com, ve
 | `APPLICATIONS_TO_EMAIL` | Optional; defaults to `admin@punchbowlbus.com.au` |
 
 Until then, the Apply section asks applicants to email their CV instead. Applications also use the same Redis rate limiting as enquiries.
+
+## Quote form layout
+
+The form follows the steps of NCore Fleets' New Booking:
+
+1. **Basic details:** your details, trip type, then vehicles & passengers (vehicle type, buses required, total passengers), and trip notes.
+2. **Route & schedule:** with two or more buses, choose "Same route for all buses" or "Different route for each bus". Then set the route (bus 1's route when the routes differ), the schedule and, on round trips, the return journey. With different routes, each of buses 2..N gets a card with its own route and pickup time, "Copy route from…" and Remove. "Copy bus 1 to all buses" fills every card at once, and **Add another bus** adds one more (up to 20 online).
+3. **Review & send:** the summary, a PDF copy and the consent checkbox.
 
 ## Route planner & Google Maps
 

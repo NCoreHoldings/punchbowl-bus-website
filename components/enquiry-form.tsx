@@ -4,18 +4,38 @@ import {
   ArrowRight,
   ArrowLeft,
   ArrowUpRight,
+  BusFront,
+  CalendarClock,
   CheckCircle2,
+  Copy,
+  CopyCheck,
   FileDown,
+  GitFork,
   LoaderCircle,
+  MapPin,
+  NotebookPen,
+  Plus,
+  Route as RouteIcon,
+  Trash2,
+  Undo2,
+  UserRound,
+  type LucideIcon,
 } from "lucide-react";
 import {
   activeBusRoutes,
-  asksSeatbelts,
+  addBus,
   buildSubmission,
+  copyRoute,
   countInput,
   differentRoutes,
   freshForm,
   MAX_SEPARATE_ROUTE_BUSES,
+  removeBus,
+  routeFilled,
+  routeLine,
+  sameRoute,
+  VEHICLE_OPTIONS,
+  validateBasics,
   withBusRoutes,
   type BusRoute,
   RECURRENCE_OPTIONS,
@@ -128,19 +148,8 @@ export function EnquiryForm() {
     setError("");
     setTimeout(() => titleRef.current?.focus(), 0);
   }
-  function validateContact() {
-    if (!form.name.trim()) return "Please enter your contact name.";
-    if (!form.email.trim() && !form.phone.trim())
-      return "Please enter an email address or phone number so we can contact you.";
-    try {
-      buildSubmission(form, "validate");
-      return null;
-    } catch {
-      return "Please check your email address, contact details and notes.";
-    }
-  }
   function next() {
-    const issue = step === 0 ? validateJourney(form) : validateContact();
+    const issue = step === 0 ? validateBasics(form) : validateJourney(form);
     if (issue) {
       setError(issue);
       return;
@@ -161,7 +170,7 @@ export function EnquiryForm() {
       return;
     }
     if (!pending.current) {
-      const issue = validateJourney(form) || validateContact();
+      const issue = validateBasics(form) || validateJourney(form);
       if (issue) {
         setError(issue);
         return;
@@ -289,6 +298,7 @@ export function EnquiryForm() {
     maxDigits: number,
     required: boolean,
     extra: Record<string, string> = {},
+    hint = "",
   ) => (
     <label className="field" key={key}>
       <span>
@@ -314,10 +324,37 @@ export function EnquiryForm() {
         disabled={locked || busy}
         {...extra}
       />
+      {hint && <small>{hint}</small>}
     </label>
   );
   const buses = Number(form.busCount) || 0;
   const separate = differentRoutes(form);
+  const multi = buses >= 2 && form.tripType !== "shuttle";
+  const otherBuses = activeBusRoutes(form);
+  const allMatchBus1 = otherBuses.every((b) => sameRoute(b.route, form.outbound));
+  function copyBus1ToAll() {
+    const customised = otherBuses.filter(
+      (b) => routeFilled(b.route) && !sameRoute(b.route, form.outbound),
+    );
+    if (
+      customised.length &&
+      !window.confirm(
+        `Replace the route of ${customised
+          .map((b) => `bus ${otherBuses.indexOf(b) + 2}`)
+          .join(", ")} with bus 1's?`,
+      )
+    )
+      return;
+    const ids = new Set(otherBuses.map((b) => b.id));
+    update(
+      "busRoutes",
+      form.busRoutes.map((b) =>
+        ids.has(b.id)
+          ? { ...b, route: copyRoute(form.outbound), time: "", returnTime: "" }
+          : b,
+      ),
+    );
+  }
   // The server reports whether the booking system is configured; without it, sending
   // can never succeed, so the review step explains this next to the button.
   const offline = step === 2 && available === false;
@@ -386,7 +423,7 @@ export function EnquiryForm() {
       }}
     >
       <ol className="form-steps" aria-label="Enquiry progress">
-        {["Journey", "Contact", "Review & submit"].map((label, i) => (
+        {["Basic details", "Route & schedule", "Review & send"].map((label, i) => (
           <li
             key={label}
             className={step === i ? "current" : ""}
@@ -407,8 +444,8 @@ export function EnquiryForm() {
       <h2 tabIndex={-1} ref={titleRef}>
         {
           [
-            "First, the journey.",
-            "Now, a little about you.",
+            "First, the basic details.",
+            "Now, the route and schedule.",
             "Everything looking good?",
           ][step]
         }
@@ -416,8 +453,8 @@ export function EnquiryForm() {
       <p className="form-intro">
         {
           [
-            "All dates and times are local to Sydney. Fields marked * are required.",
-            "We’ll use these details to follow up about your trip.",
+            "Who’s travelling and what you need. You’ll set the route and times next. Fields marked * are required.",
+            "Set the pickup, stops and drop-off, then the date and time. With two or more buses, each bus can have its own route.",
             "Check your details before sending your request to our charter team.",
           ][step]
         }
@@ -434,210 +471,141 @@ export function EnquiryForm() {
         </div>
       )}
       {step === 0 && (
-        <div className="form-grid">
-          <fieldset className="field full trip-types">
-            <legend>Trip type *</legend>
-            <div className="trip-type-options">
-              {TRIP_TYPE_OPTIONS.map((t) => (
-                <label key={t.value} className="trip-type">
-                  <input
-                    type="radio"
-                    name="tripType"
-                    value={t.value}
-                    checked={form.tripType === t.value}
-                    disabled={locked || busy}
-                    onChange={() => update("tripType", t.value)}
-                  />
-                  <span>
-                    <strong>{t.label}</strong>
-                    <small>{t.hint}</small>
-                  </span>
-                </label>
-              ))}
+        <div className="booking-sections">
+          <Section icon={UserRound} title="Your details">
+            <div className="form-grid">
+              {field("name", "Contact name", "text", true, false, {
+                maxLength: 200,
+                autoComplete: "name",
+              })}
+              {field(
+                "customerGroup",
+                "School, organisation or group (optional)",
+                "text",
+                false,
+                false,
+                { maxLength: 200, autoComplete: "organization" },
+              )}
+              {field("email", "Email address", "email", false, false, {
+                autoComplete: "email",
+              })}
+              {field("phone", "Phone number", "tel", false, false, {
+                maxLength: 60,
+                autoComplete: "tel",
+              })}
+              <p className="field full field-hint">
+                Please provide at least one of email or phone.
+              </p>
             </div>
-          </fieldset>
-          {form.tripType === "shuttle" && (
-            <p className="field full form-intro">
-              We run repeated trips between one pickup and one drop-off until
-              everyone has arrived. Tell us the total number of passengers and
-              your time window, and we’ll plan the runs.
-            </p>
-          )}
-          <div className="field full">
-            <span>
-              {form.tripType === "shuttle"
-                ? "Shuttle route"
-                : separate
-                  ? "Bus 1 route"
-                  : "Your route"}{" "}
-              *
-            </span>
-            <ItineraryEditor
-              leg="outward"
-              route={form.outbound}
-              onChange={(route) => update("outbound", route)}
-              service={maps}
-              disabled={locked || busy}
-            />
-          </div>
-          {field("date", dateLabel[form.tripType], "date", true, false, {
-            min: sydneyToday(),
-          })}
-          {field("time", timeLabel[form.tripType], "time")}
-          {form.tripType === "shuttle" &&
-            field("finishTime", "Everyone delivered by (optional)", "time")}
-          {form.tripType === "repeatable" && (
-            <>
-              <div className="form-divider">
-                <h3>How often?</h3>
-                <p>
-                  Each trip uses the same route and pickup time. We can quote
-                  up to one year of trips.
-                </p>
+          </Section>
+          <Section icon={RouteIcon} title="Trip type">
+            <fieldset className="field full trip-types">
+              <legend className="visually-hidden">Trip type *</legend>
+              <div className="trip-type-options">
+                {TRIP_TYPE_OPTIONS.map((t) => (
+                  <label key={t.value} className="trip-type">
+                    <input
+                      type="radio"
+                      name="tripType"
+                      value={t.value}
+                      checked={form.tripType === t.value}
+                      disabled={locked || busy}
+                      onChange={() => update("tripType", t.value)}
+                    />
+                    <span>
+                      <strong>{t.label}</strong>
+                      <small>{t.hint}</small>
+                    </span>
+                  </label>
+                ))}
               </div>
-              <label className="field">
-                <span>Repeats *</span>
-                <select
-                  value={form.recurrenceType}
-                  disabled={locked || busy}
-                  onChange={(e) => {
-                    const type = e.target.value as RecurrenceType;
-                    setForm((f) => ({
-                      ...f,
-                      recurrenceType: type,
-                      // Start a weekly schedule on the first trip's weekday.
-                      recurrenceDays:
-                        type === "weekly" && !f.recurrenceDays.length && f.date
-                          ? [new Date(`${f.date}T12:00Z`).getUTCDay()]
-                          : f.recurrenceDays,
-                    }));
-                    setError("");
-                  }}
-                >
-                  {RECURRENCE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                {form.recurrenceType === "monthly" &&
-                  Number(form.date.slice(8)) > 28 && (
-                    <small>
-                      Months without day {Number(form.date.slice(8))} are
-                      skipped.
-                    </small>
-                  )}
-              </label>
-              {field("recurrenceEndDate", "Last trip date", "date", true, false, {
-                min: form.date || sydneyToday(),
-              })}
-              {form.recurrenceType === "weekly" && (
-                <fieldset className="field full weekdays">
-                  <legend>On these days *</legend>
-                  <div>
-                    {[1, 2, 3, 4, 5, 6, 0].map((d) => (
-                      <label key={d}>
-                        <input
-                          type="checkbox"
-                          name="recurrenceDays"
-                          value={d}
-                          checked={form.recurrenceDays.includes(d)}
-                          disabled={locked || busy}
-                          onChange={(e) =>
-                            update(
-                              "recurrenceDays",
-                              e.target.checked
-                                ? [...form.recurrenceDays, d].sort()
-                                : form.recurrenceDays.filter((x) => x !== d),
-                            )
-                          }
-                        />
-                        <span>{WEEKDAYS[d]}</span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              )}
-            </>
-          )}
-          {form.tripType === "round_trip" && (
-            <>
-              <div className="form-divider">
-                <h3>The journey home</h3>
-                <p>
-                  By default we’ll drive your outward route in reverse.
-                </p>
+            </fieldset>
+            {form.tripType === "shuttle" && (
+              <p className="field-hint">
+                We run repeated trips between one pickup and one drop-off until
+                everyone has arrived. Tell us the total number of passengers
+                and your time window, and we’ll plan the runs.
+              </p>
+            )}
+          </Section>
+          <Section icon={BusFront} title="Vehicles & passengers">
+            <fieldset className="field full trip-types">
+              <legend>Vehicle type</legend>
+              <div className="trip-type-options three">
+                {VEHICLE_OPTIONS.map((v) => (
+                  <label key={v.value} className="trip-type">
+                    <input
+                      type="radio"
+                      name="vehicle"
+                      value={v.value}
+                      checked={form.vehicle === v.value}
+                      disabled={locked || busy}
+                      onChange={() => update("vehicle", v.value)}
+                    />
+                    <span>
+                      <strong>{v.value}</strong>
+                      <small>{v.hint}</small>
+                    </span>
+                  </label>
+                ))}
               </div>
-              {field("returnDate", "Return date", "date", true, false, {
-                min: form.date || sydneyToday(),
-              })}
-              {field("returnTime", "Return departure time (optional)", "time")}
-              <label className="consent field full">
-                <input
-                  type="checkbox"
-                  checked={form.returnReversed}
-                  disabled={locked || busy}
-                  onChange={(e) => {
-                    const reversed = e.target.checked;
-                    setForm((f) => ({
-                      ...f,
-                      returnReversed: reversed,
-                      inbound:
-                        !reversed && !f.inbound.some((p) => p.address.trim())
-                          ? reverseRoute(f.outbound)
-                          : f.inbound,
-                    }));
-                    setError("");
-                  }}
-                />
-                <span>Return by the same route in reverse</span>
-              </label>
-              {form.returnReversed ? (
-                <p className="field full route-summary">
-                  {routeSummary(returnRoute(form))}
-                </p>
-              ) : (
-                <div className="field full">
-                  <span>Return route *</span>
-                  <ItineraryEditor
-                    leg="return"
-                    route={form.inbound}
-                    onChange={(route) => update("inbound", route)}
-                    service={maps}
-                    disabled={locked || busy}
-                  />
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={locked || busy}
-                    onClick={() => update("inbound", reverseRoute(form.outbound))}
-                  >
-                    Copy outward route in reverse
-                  </button>
-                </div>
+            </fieldset>
+            <div className="form-grid">
+              {countField(
+                "busCount",
+                "Buses required (optional)",
+                3,
+                false,
+                { placeholder: "Let our team advise" },
+                form.tripType === "shuttle"
+                  ? "The runs are shared between the buses."
+                  : "Two or more buses can each have their own route.",
               )}
-            </>
-          )}
-          <div className="form-divider">
-            <h3>Who’s coming along?</h3>
-          </div>
-          {countField(
-            "passengerCount",
-            form.tripType === "shuttle"
-              ? "Total passengers to move"
-              : "Number of passengers",
-            5,
-            true,
-          )}
-          {countField("busCount", "Number of buses (optional)", 3, false, {
-            placeholder: "Let our team advise",
-          })}
-          {buses >= 2 && form.tripType === "shuttle" && (
-            <p className="field full form-intro">
-              All shuttle buses share one route and take turns running it.
-            </p>
-          )}
-          {buses >= 2 && form.tripType !== "shuttle" && (
+              {countField(
+                "passengerCount",
+                form.tripType === "shuttle"
+                  ? "Total passengers to move"
+                  : "Total passengers",
+                5,
+                true,
+                {},
+                form.tripType === "shuttle"
+                  ? "Everyone to move across all runs."
+                  : "Across all buses.",
+              )}
+            </div>
+            {multi && (
+              <p className="info-note">
+                {separate
+                  ? `Each of the ${buses} buses has its own route — you’ll set them on the next step.`
+                  : `All ${buses} buses share one route. You can give each bus its own route on the next step.`}
+              </p>
+            )}
+            {buses >= 2 && form.tripType === "shuttle" && (
+              <p className="info-note">
+                All shuttle buses share one route and take turns running it.
+              </p>
+            )}
+          </Section>
+          <Section icon={NotebookPen} title="Trip notes">
+            <label className="field full">
+              <span>Anything else we should know? (optional)</span>
+              <textarea
+                maxLength={15000}
+                rows={4}
+                value={form.notes}
+                disabled={locked || busy}
+                onChange={(e) => update("notes", e.target.value)}
+                placeholder="Accessibility requirements, luggage, timing needs or other trip details"
+              />
+              <small>Please avoid including sensitive passenger information.</small>
+            </label>
+          </Section>
+        </div>
+      )}
+      {step === 1 && (
+        <div className="booking-sections">
+          {multi && (
             <fieldset className="field full trip-types">
               <legend>Routes for the {buses} buses *</legend>
               <div className="trip-type-options two">
@@ -646,15 +614,17 @@ export function EnquiryForm() {
                     [
                       "same",
                       "Same route for all buses",
-                      "Every bus follows the route above",
+                      "One shared route and schedule",
+                      RouteIcon,
                     ],
                     [
                       "different",
                       "Different route for each bus",
-                      "Each bus has its own stops and pickup time",
+                      "Each bus gets its own stops and pickup time",
+                      GitFork,
                     ],
                   ] as const
-                ).map(([value, label, hint]) => (
+                ).map(([value, label, hint, Icon]) => (
                   <label key={value} className="trip-type">
                     <input
                       type="radio"
@@ -666,26 +636,253 @@ export function EnquiryForm() {
                         setForm((f) => withBusRoutes({ ...f, routeMode: value }))
                       }
                     />
-                    <span>
-                      <strong>{label}</strong>
-                      <small>{hint}</small>
+                    <span className="with-icon">
+                      <Icon size={18} aria-hidden />
+                      <span>
+                        <strong>{label}</strong>
+                        <small>{hint}</small>
+                      </span>
                     </span>
                   </label>
                 ))}
               </div>
             </fieldset>
           )}
+          <Section
+            icon={MapPin}
+            title={
+              form.tripType === "shuttle"
+                ? "Shuttle route"
+                : separate
+                  ? "Bus 1 route"
+                  : multi
+                    ? "Route (all buses)"
+                    : "Route"
+            }
+            hint="Pickup point, any passenger stops, then the drop-off."
+          >
+            <ItineraryEditor
+              leg="outward"
+              route={form.outbound}
+              onChange={(route) => update("outbound", route)}
+              service={maps}
+              disabled={locked || busy}
+            />
+          </Section>
+          <Section
+            icon={CalendarClock}
+            title={
+              separate
+                ? "Bus 1 schedule"
+                : multi
+                  ? "Schedule (all buses)"
+                  : "Schedule"
+            }
+            hint="All dates and times are Sydney local time."
+          >
+            <div className="form-grid">
+              {field("date", dateLabel[form.tripType], "date", true, false, {
+                min: sydneyToday(),
+              })}
+              {field("time", timeLabel[form.tripType], "time")}
+              {form.tripType === "shuttle" &&
+                field("finishTime", "Everyone delivered by (optional)", "time")}
+              {form.tripType === "repeatable" && (
+                <>
+                  <p className="field full sub-heading">
+                    <strong>How often?</strong> Each trip uses the same route
+                    and pickup time. We can quote up to one year of trips.
+                  </p>
+                  <label className="field">
+                    <span>Repeats *</span>
+                    <select
+                      value={form.recurrenceType}
+                      disabled={locked || busy}
+                      onChange={(e) => {
+                        const type = e.target.value as RecurrenceType;
+                        setForm((f) => ({
+                          ...f,
+                          recurrenceType: type,
+                          // Start a weekly schedule on the first trip's weekday.
+                          recurrenceDays:
+                            type === "weekly" &&
+                            !f.recurrenceDays.length &&
+                            f.date
+                              ? [new Date(`${f.date}T12:00Z`).getUTCDay()]
+                              : f.recurrenceDays,
+                        }));
+                        setError("");
+                      }}
+                    >
+                      {RECURRENCE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    {form.recurrenceType === "monthly" &&
+                      Number(form.date.slice(8)) > 28 && (
+                        <small>
+                          Months without day {Number(form.date.slice(8))} are
+                          skipped.
+                        </small>
+                      )}
+                  </label>
+                  {field(
+                    "recurrenceEndDate",
+                    "Last trip date",
+                    "date",
+                    true,
+                    false,
+                    { min: form.date || sydneyToday() },
+                  )}
+                  {form.recurrenceType === "weekly" && (
+                    <fieldset className="field full weekdays">
+                      <legend>On these days *</legend>
+                      <div>
+                        {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                          <label key={d}>
+                            <input
+                              type="checkbox"
+                              name="recurrenceDays"
+                              value={d}
+                              checked={form.recurrenceDays.includes(d)}
+                              disabled={locked || busy}
+                              onChange={(e) =>
+                                update(
+                                  "recurrenceDays",
+                                  e.target.checked
+                                    ? [...form.recurrenceDays, d].sort()
+                                    : form.recurrenceDays.filter(
+                                        (x) => x !== d,
+                                      ),
+                                )
+                              }
+                            />
+                            <span>{WEEKDAYS[d]}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  )}
+                </>
+              )}
+            </div>
+          </Section>
+          {form.tripType === "round_trip" && (
+            <Section
+              icon={Undo2}
+              title={separate ? "Bus 1 return journey" : "Return journey"}
+              hint="By default we’ll drive the outward route in reverse."
+            >
+              <div className="form-grid">
+                {field("returnDate", "Return date", "date", true, false, {
+                  min: form.date || sydneyToday(),
+                })}
+                {field("returnTime", "Return departure time (optional)", "time")}
+                <label className="consent field full">
+                  <input
+                    type="checkbox"
+                    checked={form.returnReversed}
+                    disabled={locked || busy}
+                    onChange={(e) => {
+                      const reversed = e.target.checked;
+                      setForm((f) => ({
+                        ...f,
+                        returnReversed: reversed,
+                        inbound:
+                          !reversed && !f.inbound.some((p) => p.address.trim())
+                            ? reverseRoute(f.outbound)
+                            : f.inbound,
+                      }));
+                      setError("");
+                    }}
+                  />
+                  <span>Return by the same route in reverse</span>
+                </label>
+                {form.returnReversed ? (
+                  <p className="field full route-summary">
+                    {routeSummary(returnRoute(form))}
+                  </p>
+                ) : (
+                  <div className="field full">
+                    <span>Return route *</span>
+                    <ItineraryEditor
+                      leg="return"
+                      route={form.inbound}
+                      onChange={(route) => update("inbound", route)}
+                      service={maps}
+                      disabled={locked || busy}
+                    />
+                    <button
+                      type="button"
+                      className="text-button"
+                      disabled={locked || busy}
+                      onClick={() =>
+                        update("inbound", reverseRoute(form.outbound))
+                      }
+                    >
+                      Copy outward route in reverse
+                    </button>
+                  </div>
+                )}
+              </div>
+            </Section>
+          )}
           {separate && (
-            <>
+            <section className="bus-cards" aria-label="Other buses">
+              <div className="bus-cards-head">
+                <h3>
+                  {buses === 2
+                    ? "Bus 2: its own route"
+                    : `Buses 2–${Math.min(buses, MAX_SEPARATE_ROUTE_BUSES)}: separate routes`}
+                </h3>
+                <p>Bus numbers are just references for your request.</p>
+              </div>
               {buses > MAX_SEPARATE_ROUTE_BUSES && (
-                <p className="field full form-message warning">
+                <p className="form-message warning">
                   We can take separate routes for up to{" "}
                   {MAX_SEPARATE_ROUTE_BUSES} buses online. For more, choose
                   “Same route for all buses” and describe the routes in your
                   notes, or call {company.phone}.
                 </p>
               )}
-              {activeBusRoutes(form).map((bus, i) => {
+              <div
+                className={`copy-banner ${routeFilled(form.outbound) ? "ready" : ""}`}
+              >
+                <span>
+                  {routeFilled(form.outbound) ? (
+                    <>
+                      <strong>Bus 1:</strong> {routeLine(form.outbound)}. Copy
+                      it to the other buses, then change only what differs.
+                    </>
+                  ) : (
+                    "Fill in bus 1’s pickup and drop-off above to copy its route to the other buses."
+                  )}
+                </span>
+                <button
+                  type="button"
+                  className="button outline small"
+                  disabled={
+                    locked ||
+                    busy ||
+                    !routeFilled(form.outbound) ||
+                    allMatchBus1
+                  }
+                  onClick={copyBus1ToAll}
+                >
+                  {allMatchBus1 && routeFilled(form.outbound) ? (
+                    <>
+                      <CopyCheck size={15} /> All buses match bus 1
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={15} /> Copy bus 1 to all buses
+                    </>
+                  )}
+                </button>
+              </div>
+              {otherBuses.map((bus, i) => {
                 const n = i + 2;
                 const change = (patch: Partial<BusRoute>) =>
                   update(
@@ -694,133 +891,174 @@ export function EnquiryForm() {
                       b.id === bus.id ? { ...b, ...patch } : b,
                     ),
                   );
+                const sources = [
+                  { n: 1, route: form.outbound, time: "", returnTime: "" },
+                  ...otherBuses
+                    .slice(0, i)
+                    .map((b, j) => ({ ...b, n: j + 2 })),
+                ].filter((s) => routeFilled(s.route));
                 return (
-                  <div className="field full bus-route" key={bus.id}>
-                    <span>Bus {n} route *</span>
-                    <ItineraryEditor
-                      leg={`bus-${n}`}
-                      route={bus.route}
-                      onChange={(route) => change({ route })}
-                      service={maps}
-                      disabled={locked || busy}
-                    />
-                    <div className="bus-route-times">
-                      <label className="field">
-                        <span>Bus {n} departure time</span>
-                        <input
-                          type="time"
-                          name={`bus-${n}-time`}
-                          value={bus.time}
+                  <article
+                    className="bus-card"
+                    key={bus.id}
+                    aria-labelledby={`bus-${n}-title`}
+                  >
+                    <header>
+                      <span className="bus-badge" aria-hidden>
+                        <BusFront size={17} />
+                      </span>
+                      <div className="bus-card-title">
+                        <h4 id={`bus-${n}-title`}>Bus {n}</h4>
+                        <p>
+                          {routeFilled(bus.route)
+                            ? routeLine(bus.route)
+                            : "Own route and pickup time"}
+                        </p>
+                      </div>
+                      <div className="bus-card-tools">
+                        {sources.length > 0 && (
+                          <select
+                            aria-label={`Copy a route onto bus ${n}`}
+                            value=""
+                            disabled={locked || busy}
+                            onChange={(e) => {
+                              const s = sources.find(
+                                (x) => x.n === Number(e.target.value),
+                              );
+                              if (s)
+                                change({
+                                  route: copyRoute(s.route),
+                                  time: s.time,
+                                  returnTime: s.returnTime,
+                                });
+                            }}
+                          >
+                            <option value="">Copy route from…</option>
+                            {sources.map((s) => (
+                              <option key={s.n} value={s.n}>
+                                Bus {s.n}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <button
+                          type="button"
+                          className="text-button"
                           disabled={locked || busy}
-                          onChange={(e) => change({ time: e.target.value })}
-                        />
-                        <small>Leave empty for the same time as bus 1.</small>
-                      </label>
-                      {form.tripType === "round_trip" && (
+                          onClick={() => setForm((f) => removeBus(f, bus.id))}
+                          aria-label={`Remove bus ${n}`}
+                        >
+                          <Trash2 size={15} /> Remove
+                        </button>
+                      </div>
+                    </header>
+                    <div className="bus-card-body">
+                      <ItineraryEditor
+                        leg={`bus-${n}`}
+                        route={bus.route}
+                        onChange={(route) => change({ route })}
+                        service={maps}
+                        disabled={locked || busy}
+                      />
+                      <div className="bus-route-times">
                         <label className="field">
-                          <span>Bus {n} return departure time</span>
+                          <span>Bus {n} pickup time</span>
                           <input
                             type="time"
-                            name={`bus-${n}-return-time`}
-                            value={bus.returnTime}
+                            name={`bus-${n}-time`}
+                            value={bus.time}
                             disabled={locked || busy}
-                            onChange={(e) =>
-                              change({ returnTime: e.target.value })
-                            }
+                            onChange={(e) => change({ time: e.target.value })}
                           />
                           <small>
-                            Returns on the same day as bus 1, along its route
-                            in reverse.
+                            Same day as bus 1. Leave empty for the same time.
                           </small>
                         </label>
-                      )}
+                        {form.tripType === "round_trip" && (
+                          <label className="field">
+                            <span>Bus {n} return departure time</span>
+                            <input
+                              type="time"
+                              name={`bus-${n}-return-time`}
+                              value={bus.returnTime}
+                              disabled={locked || busy}
+                              onChange={(e) =>
+                                change({ returnTime: e.target.value })
+                              }
+                            />
+                            <small>
+                              Returns on bus 1’s return date, along this route
+                              in reverse.
+                            </small>
+                          </label>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </article>
                 );
               })}
-            </>
+            </section>
           )}
-          <label className="field">
-            <span>Vehicle preference</span>
-            <select
-              value={form.vehicle}
-              disabled={locked || busy}
-              onChange={(e) => update("vehicle", e.target.value)}
-            >
-              {["No preference", "Bus", "Coach"].map((v) => (
-                <option key={v}>{v}</option>
-              ))}
-            </select>
-          </label>
-          {asksSeatbelts(form) && (
-            <label className="field">
-              <span>Seat belts</span>
-              <select
-                value={form.seatbelts}
+          {form.tripType !== "shuttle" &&
+            (separate || buses <= 1) &&
+            buses < MAX_SEPARATE_ROUTE_BUSES && (
+              <button
+                type="button"
+                className="add-bus"
                 disabled={locked || busy}
-                onChange={(e) => update("seatbelts", e.target.value)}
+                onClick={() => setForm(addBus)}
               >
-                {["Please discuss", "Required", "No preference"].map((v) => (
-                  <option key={v}>{v}</option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-      )}
-      {step === 1 && (
-        <div className="form-grid">
-          {field("name", "Contact name", "text", true, true, {
-            maxLength: 200,
-            autoComplete: "name",
-          })}
-          {field(
-            "customerGroup",
-            "School, organisation or group (optional)",
-            "text",
-            false,
-            true,
-            { maxLength: 200, autoComplete: "organization" },
-          )}
-          {field("email", "Email address", "email", false, true, {
-            autoComplete: "email",
-          })}
-          {field("phone", "Phone number", "tel", false, true, {
-            maxLength: 60,
-            autoComplete: "tel",
-          })}
-          <p className="field full form-intro">
-            Please provide at least one of email or phone.
-          </p>
-          <label className="field full">
-            <span>Anything else we should know? (optional)</span>
-            <textarea
-              maxLength={15000}
-              rows={5}
-              value={form.notes}
-              onChange={(e) => update("notes", e.target.value)}
-              placeholder="Accessibility requirements, extra stops, timing needs or other trip details"
-            />
-            <small>
-              Please avoid including sensitive passenger information.
-            </small>
-          </label>
+                <Plus size={18} />
+                {separate
+                  ? "Add another bus"
+                  : "Add another bus with a different route"}
+              </button>
+            )}
         </div>
       )}
       {step === 2 && (
         <>
           <dl className="review-list">
             <div>
+              <dt>Your details</dt>
+              <dd>
+                {form.name}
+                {form.customerGroup && ` · ${form.customerGroup}`}
+                {form.email && (
+                  <>
+                    <br />
+                    {form.email}
+                  </>
+                )}
+                {form.phone && (
+                  <>
+                    <br />
+                    {form.phone}
+                  </>
+                )}
+              </dd>
+            </div>
+            <div>
               <dt>Trip type</dt>
               <dd>{tripTypeLabel(form.tripType)}</dd>
             </div>
             <div>
-              <dt>Passengers / buses</dt>
+              <dt>Vehicles & passengers</dt>
               <dd>
-                {form.passengerCount} passengers ·{" "}
+                {form.vehicle === "No preference"
+                  ? "Any vehicle"
+                  : form.vehicle}{" "}
+                ·{" "}
                 {form.busCount
-                  ? `${form.busCount} bus(es)`
-                  : "Buses to be advised"}
+                  ? `${form.busCount} bus${form.busCount === "1" ? "" : "es"}`
+                  : "Buses to be advised"}{" "}
+                · {form.passengerCount} passengers
+                {separate && (
+                  <>
+                    <br />
+                    Each bus has its own route
+                  </>
+                )}
               </dd>
             </div>
             <div className="full">
@@ -896,27 +1134,9 @@ export function EnquiryForm() {
                   </dd>
                 </div>
               ))}
-            <div>
-              <dt>Contact</dt>
-              <dd>
-                {form.name}
-                {form.customerGroup && ` · ${form.customerGroup}`}
-                <br />
-                {form.email}
-                <br />
-                {form.phone}
-              </dd>
-            </div>
-            <div>
-              <dt>Preferences</dt>
-              <dd>
-                {form.vehicle}
-                {asksSeatbelts(form) && ` · Seat belts: ${form.seatbelts}`}
-              </dd>
-            </div>
             {form.notes && (
               <div className="full">
-                <dt>Additional details</dt>
+                <dt>Trip notes</dt>
                 <dd>{form.notes}</dd>
               </div>
             )}
@@ -1031,6 +1251,29 @@ export function EnquiryForm() {
         </button>
       </div>
     </form>
+  );
+}
+
+function Section({
+  icon: Icon,
+  title,
+  hint,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="booking-section">
+      <h3>
+        <Icon size={18} aria-hidden />
+        {title}
+      </h3>
+      {hint && <p className="field-hint">{hint}</p>}
+      {children}
+    </section>
   );
 }
 

@@ -83,8 +83,8 @@ export default function FleetPage() {
           Need a bus <span className="accent">or a coach?</span>
         </h2>
         <p className="lead">
-          Choose your vehicle preference and seatbelt requirement in the quote
-          form.
+          Choose a bus or coach in the quote form, and tell us about any seat
+          belt or accessibility needs in your trip notes.
         </p>
         <Link className="button" href="/request-a-quote">
           Request a quote <ArrowUpRight size={18} aria-hidden="true" />
