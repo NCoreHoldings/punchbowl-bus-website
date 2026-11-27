@@ -185,7 +185,7 @@ export function createEnquiryHandler(
       if (upstream.status === 422)
         return reply(422, {
           error:
-            "NCore could not accept these journey details. Check your dates and times, including Sydney daylight saving changes, or call our team.",
+            "We could not accept these journey details. Check your dates and times, including Sydney daylight saving changes, or call our team.",
         });
       if (upstream.status === 413)
         return reply(413, {

@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   CheckCircle2,
+  FileDown,
   LoaderCircle,
 } from "lucide-react";
 import {
@@ -37,6 +38,7 @@ import { pointLabel, reverseRoute, type TripPoint } from "@/lib/itinerary";
 import { ItineraryEditor } from "./itinerary-editor";
 import { company } from "@/lib/content";
 import { restorePending, type PendingRequest } from "@/lib/pending-request";
+import { downloadRequestPdf, type RequestPdfStatus } from "@/lib/request-pdf";
 const STORAGE = "punchbowl-pending-enquiry-v1";
 type Pending = PendingRequest;
 type Receipt = { receiptId: string; receivedAt: string };
@@ -52,6 +54,12 @@ export function EnquiryForm() {
   const [locked, setLocked] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  /** The request exactly as sent, kept for its PDF after the form clears. */
+  const [sent, setSent] = useState<{ form: TripForm; reference: string } | null>(
+    null,
+  );
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState("");
   const [consent, setConsent] = useState(false);
   const [wait, setWait] = useState(0);
   const [conflict, setConflict] = useState(false);
@@ -192,6 +200,10 @@ export function EnquiryForm() {
         typeof result.receiptId === "string" &&
         typeof result.receivedAt === "string"
       ) {
+        setSent({
+          form: snapshot.form,
+          reference: JSON.parse(snapshot.body).payload.sourceSubmissionId,
+        });
         setReceipt(result);
         clearPending();
         return;
@@ -218,6 +230,33 @@ export function EnquiryForm() {
       setBusy(false);
     }
   }
+  async function savePdf(source: TripForm, status: RequestPdfStatus) {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    setPdfError("");
+    try {
+      await downloadRequestPdf(source, status);
+    } catch {
+      setPdfError("The PDF could not be created. Please try again.");
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+  const pdfButton = (source: TripForm, status: RequestPdfStatus) => (
+    <button
+      type="button"
+      className="button outline"
+      disabled={pdfBusy}
+      onClick={() => void savePdf(source, status)}
+    >
+      {pdfBusy ? (
+        <LoaderCircle className="loading-spinner" size={17} />
+      ) : (
+        <FileDown size={17} />
+      )}
+      Download PDF
+    </button>
+  );
   const field = (
     key: TextKey,
     label: string,
@@ -279,7 +318,7 @@ export function EnquiryForm() {
   );
   const buses = Number(form.busCount) || 0;
   const separate = differentRoutes(form);
-  // The server reports whether NCore Fleets is configured; without it, sending
+  // The server reports whether the booking system is configured; without it, sending
   // can never succeed, so the review step explains this next to the button.
   const offline = step === 2 && available === false;
   const prettyDate = (s: string) =>
@@ -300,8 +339,8 @@ export function EnquiryForm() {
           is on its way.
         </h2>
         <p>
-          Your enquiry has been received by our team in NCore Fleets. We’ll
-          review your trip details and contact you using the details you
+          Your enquiry has been received by the Punchbowl Bus Company team.
+          We’ll review your trip details and contact you using the details you
           provided.
         </p>
         <div className="receipt">
@@ -320,9 +359,21 @@ export function EnquiryForm() {
           Availability, pricing and arrangements will be discussed with our
           team.
         </p>
-        <a className="button dark" href="/">
-          Back to home <ArrowUpRight size={18} />
-        </a>
+        <div className="success-actions">
+          {sent &&
+            pdfButton(sent.form, {
+              reference: sent.reference,
+              receipt,
+            })}
+          <a className="button dark" href="/">
+            Back to home <ArrowUpRight size={18} />
+          </a>
+        </div>
+        {pdfError && (
+          <p className="form-message" role="alert">
+            {pdfError}
+          </p>
+        )}
       </div>
     );
   return (
@@ -880,8 +931,7 @@ export function EnquiryForm() {
             />
             <span>
               I understand this is a quote request, not a confirmed booking. My
-              details will be sent to Punchbowl’s enquiry team using NCore
-              Fleets.{" "}
+              details will be sent to Punchbowl Bus Company’s enquiry team.{" "}
               <a
                 href={`${company.source}/privacy`}
                 target="_blank"
@@ -891,6 +941,22 @@ export function EnquiryForm() {
               </a>
             </span>
           </label>
+          <div className="pdf-download">
+            <p>
+              Keep a copy of this quote request, or share it with your group.
+            </p>
+            {pdfButton(form, {
+              reference:
+                locked && pending.current
+                  ? JSON.parse(pending.current.body).payload.sourceSubmissionId
+                  : undefined,
+            })}
+          </div>
+          {pdfError && (
+            <p className="form-message" role="alert">
+              {pdfError}
+            </p>
+          )}
           {locked && (
             <p className="form-message warning">
               Your request details are held unchanged until receipt is
